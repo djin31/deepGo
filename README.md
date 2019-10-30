@@ -60,11 +60,13 @@ We have provided you a sample of AlphaGoPlayer: `AlphaGoPlayer_1.py` and `AlphaG
 
 ### Running a single match instance
 
-`single_match.py` contains the class `SingleMatch()`, which is initialized by `board_size`, `komi_value` and the `match_directory` (diirectory location for the match between 2 opponents). It has the following functions:
+`single_match.py` contains the class `SingleMatch()`, which is initialized by `board_size`, `komi_value` and the `match_directory` (directory location for the match between 2 opponents). It has the following functions:
 
 * `get_action(s_t)`: used to obtain the action by a particular player from `AlphaGoPlayer_<group_id>.py`.
 
 * `run_match()`: Runs 1 match instance between the 2 players(player order decided in `tournament.py`). Returns winner, score after the match is completed(positive score indicates white player won and negative score indicates black player won) and writes the history of actions taken by each player in `actions.csv`
+
+> NOTE: If you want to run `single_match.py`, you will have to import `AlphaGoPlayer`. `tournament.py` takes care of this by making a temporary python file depending on which pair of players are selected.
 
 ### How to run the Tournament
 
