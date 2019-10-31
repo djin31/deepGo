@@ -9,5 +9,8 @@ class AlphaGoPlayer():
     def get_action(self, cur_state):
         # Do Coolstuff using cur_state
         # Check illegal Move
+        print ('i am player 1')
+        return 169
+
         action = np.random.randint(0, 169)
         return action

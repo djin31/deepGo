@@ -75,3 +75,6 @@ class SingleMatch():
             # Book Keeping
             i += 1
         self.env.close()
+
+with open('test', 'a') as f:
+    f.write('hey1\n')

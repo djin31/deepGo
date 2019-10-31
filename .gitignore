@@ -102,3 +102,12 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# Custom
+Tournament/
+tmp_match.py
+__pycache__
+match_12
+.idea/
+.vscode/
+modules/
