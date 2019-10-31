@@ -100,3 +100,4 @@ $HOME/anaconda3/envs/<env_name>/bin/pip install pachi-py
 ```
 
 You should also install other libraries required by your code like `numpy`. Make sure that you mention these on Piazza so that we can install these on our HPC systems to grade for the tournament.
+
