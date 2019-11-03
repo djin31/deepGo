@@ -1,0 +1,53 @@
+Class GoEnv(): All the API's of this class are in SuperGo.py
+
+	__init__(player_color, board_size) -> initializes the class object. Maintaines a history of last 16 moves, current player 
+
+	get_legal_moves() -> gives all legal moves of the current player based on its current state/board config in form of a numpy vector of size 170. Element is 1 if move is valid else 0. Also ensures that player does not pass if his score is less than the other.
+
+	player_turn() -> 1 if it is black's turn, -1 otherwise
+
+	give_Board() -> returns a 13*13 np array with elements as 1 if black stone, -1 if white stone, 0 if empty
+
+	reset() -> should be called after every __init__ basically resets the board
+
+	get_winner() -> after the game ends, give reward = 1 if white wins else -1
+
+	step(action) -> takes a number 0-170 as input and changes the state according to it. Raises an error if move is invalid. returns the new state, reward, done. Reward is 0 always and 1 or -1 depending on who won.
+
+	get_history() -> returns a 17*13*13 np array whose first 16 elements return move history and last element returns player turn.
+
+	curr_score() -> gives the current score of the game along with komi
+
+	isComplete() -> has the game ended
+
+	give_Board_Copy() -> returns a copy of the current board(not the whole class)
+
+Board : Board is an object which has the following API's(All the API's are there in pachi.py)
+
+	get_legal_coords(player_color, filter_suicides=True) -> player_color is 1 for black and 2 for white, it gives all the legal co-ordinates where the player can play
+
+	play(co-ordinate, player_color) -> plays the move and update the board
+
+	encode() -> returns a np array of size 3*13*13. First one is one-hot encoding for all black positions, 2nd one is white and 3rd one is empty
+
+	is_terminal() -> checks for terminal state
+
+	fast_score() -> gives the current value of the score without adding the komi
+
+	clone() -> creates a clones of the board. 
+
+For convinience, I created the following functions for board(All are present i boardFunctions.py):
+
+	get_board_moves(board,player) -> gives all legal moves of the current player based on its current state/board config in form of a numpy vector of size 170. Element is 1 if move is valid else 0. Also ensures that player does not pass if his score is less than the other. PLayer is either 1 or -1
+
+	npBoard(board) -> print the board in np format
+
+	getWinner(board) -> after the game ends, give reward = 1 if white wins else -1
+
+	take_step(board,action,player) -> takes a number(action) 0-170 as input and changes the state according to it. Raises an error if move is invalid. Player can be 1 or -1
+
+	copy_board(board) -> provides a complete copy of the board
+
+	score(board) -> gives the current score of the game along with komi
+
+	isCompleted(board) -> has the game ended
