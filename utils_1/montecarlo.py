@@ -25,11 +25,6 @@ class MonteCarlo:
         # For how many moves to use the temperature parameter
         self.tau_thres = tau_thres
 
-        # self.sims_done = 0
-
-        # Initial state
-        # self.state = game
-
         # Set of (s, pi, r) tuples
         # s here is the complete 13*13*17 state
         self.batch = []
@@ -197,14 +192,3 @@ class MonteCarlo:
 
         self.Ns[(s,a)] += 1
         return -v
-
-
-
-    # def update(self, state):
-    #     self.states.append(state)
-    #     pass
-
-    # def get_play(self):
-    #     while self.sims_done < self.max_sims:
-    #         self.run_simulator()
-
