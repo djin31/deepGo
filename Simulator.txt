@@ -12,7 +12,7 @@ Class GoEnv(): All the API's of this class are in SuperGo.py
 
 	get_winner() -> after the game ends, give reward = 1 if white wins else -1
 
-	step(action) -> takes a number 0-170 as input and changes the state according to it. Raises an error if move is invalid. returns the new state, reward, done. Reward is 0 always and 1 or -1 depending on who won.
+	step(action) -> takes a number 0-169 as input and changes the state according to it. Raises an error if move is invalid. returns the new state, reward, done. Reward is 0 always and 1 or -1 depending on who won.
 
 	get_history() -> returns a 17*13*13 np array whose first 16 elements return move history and last element returns player turn.
 

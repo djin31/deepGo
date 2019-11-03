@@ -88,8 +88,8 @@ class GoEnv():
 
         for pachi_move in legal_moves:
             move = _coord_to_action(self.board, pachi_move)
-            if move != self.board_size ** 2 or self.test_move(move):
-                final_moves[move] = 1
+#             if move != self.board_size ** 2 or self.test_move(move):
+            final_moves[move] = 1
 #         final_moves[self.board_size ** 2] = 1
 #         final_moves[self.board_size ** 2 + 1] = 1
         return final_moves
