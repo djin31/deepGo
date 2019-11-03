@@ -5,7 +5,6 @@ import sys
 import six
 # from const import HISTORY, GOBAN_SIZE
 HISTORY = 16
-GOBAN_SIZE = 13
 
 def _pass_action(board_size):
     return board_size ** 2
@@ -48,7 +47,7 @@ def _format_state(history, player_color, board_size):
 #     print(history.shape)
     to_play = np.full((1, board_size, board_size), player_color - 1)
     final_state = np.concatenate((history, to_play), axis=0)
-    return final_state
+    return final_state.astype(int)[:,:,:]
     
 
 
@@ -141,7 +140,7 @@ class GoEnv():
     
     def give_Board(self):
         board = self.board.encode()
-        act_board = np.zeros(169,dtype = int).reshape(13,13)
+        act_board = np.zeros(self.board_size**2,dtype = int).reshape(self.board_size,self.board_size)
         act_board[board[0]!=0] = 1
         act_board[board[1]!=0] = -1
         return act_board
@@ -216,7 +215,7 @@ class GoEnv():
         return result
     
 def create_env_copy (Env):
-    newEnv = GoEnv('black',13)
+    newEnv = GoEnv('black',Env.board_size)
     newEnv.reset()
     newEnv.history = deepcopy(Env.history)
     newEnv.player_color = deepcopy(Env.player_color)
