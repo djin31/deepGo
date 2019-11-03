@@ -45,6 +45,15 @@ class Player:
                 if checkpoint_path is not None:
                     self.fnet.save_model(checkpoint_path)
 
+        # Train for remaining in the batch
+        if len(batch > 0):
+            self.fnet.train(batch, logging=logging, log_file=log_file)
+            batch = [] # Empty the batch
+
+            # Save the network
+            if checkpoint_path is not None:
+                self.fnet.save_model(checkpoint_path)
+
 
 if __name__ == '__main__':
     # Create a player

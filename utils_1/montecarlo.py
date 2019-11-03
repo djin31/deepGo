@@ -16,17 +16,15 @@ class MonteCarlo:
         # Initialize the MonteCarlo class
         self.board_size = board_size
         self.num_actions = self.board_size ** 2 + 1
-        # self.game = Game(board_size)
         self.fnet = fnet
         self.max_sims = max_sims
 
-        self.cpuct = 0.5 # Set arbitarily for now..
-
-        # For how many moves to use the temperature parameter
-        self.tau_thres = tau_thres
+        # Hyperparameters
+        self.cpuct = 1.5
+        self.tau_thres = tau_thres # For how many moves to use the temperature parameter
 
         # Set of (s, pi, r) tuples
-        # s here is the complete 13*13*17 state
+        # s here is the complete 17*13*13 state
         self.batch = []
         
         # Tracking the values
@@ -46,9 +44,12 @@ class MonteCarlo:
         # Initial state -- an instance of GoEnv
         self.state = GoEnv('black', self.board_size)
         self.state.reset()
+        root_state = True # Whether this is the first state
 
-        # while np.sum(self.state.legal_moves()) > 0:
         while not self.state.isComplete():
+            # Print state
+            self.state.print_board()
+            print ('-----------------------------------------------------------------')
             # Perform a simulation on the COPY of current state
             for _sim in range(self.max_sims):
                 start_state = create_env_copy(self.state)
@@ -60,10 +61,12 @@ class MonteCarlo:
             self.batch.append(self.state.get_history(), policy, 0)
 
             # Update state
-            self.play_move(policy)
+            self.play_move(policy[:], root_state=root_state)
+            root_state = False
 
         # Update the reward and return the batch
         winner = -1 * self.state.get_winner()
+        print ("And the winner is .... %s !" % ('White' if winner == -1 else 'Black'))
 
         for idx, (s, pi, r) in enumerate(self.batch):
             player = s[16][0][0]
@@ -82,36 +85,29 @@ class MonteCarlo:
         """
         # Get the board representation of state
         s = state.give_Board()
-
-        def get_count(s, a):
-            return self.Nsa[(s,a)] if (s,a) in self.Nsa else 0
-
-        counts = np.array(map(get_count, [(s,a) for a in range(self.num_actions)]))
+# 
+        counts = np.array([self.Nsa[(s,a)] if (s,a) in self.Nsa else 0 for a in range(self.num_actions)])
 
         if self.tau_thres > 0:
-            # Take action with softmax probabilities
-            softmax_dist = softmax(counts)
-            softmax_dist = softmax_dist * self.Ms[s] # Mask with valid moves
-            softmax_dist /= np.sum(softmax_dist)
-
+            # Take action with proportional probabilities
             self.tau_thres -= 1
-
-            return softmax_dist
-
+            return counts / float(sum(counts))
         else:
             # Tau is zero, take max action
             max_dist = np.zeros(self.num_actions)
-            max_dist[np.argmax(counts)] = 1
-
+            max_dist[np.argmax(counts)] = 1.0
             return max_dist
 
-
-
-    def play_move(self, policy):
+    def play_move(self, policy, root_state):
         """
         Choose an action according to the policy from the current state
         Execute and go to the next state
+        If root_state==True, add Dirichlet noise
+        P(s, a) = (1 − e)pa + ena, where n ∼ Dir(0.03) and e = 0.25
         """
+        if root_state:
+            noise = np.random.dirichlet(alpha=((0.3,)*self.num_actions))
+            policy = 0.75 * policy + 0.25 * noise
         a = np.random.choice(np.arange(1, self.board_size ** 2 + 1), p=policy)
         self.state.step(a)
 

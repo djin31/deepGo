@@ -145,6 +145,18 @@ class GoEnv():
         act_board[board[1]!=0] = -1
         return act_board
 
+    def print_board(self):
+        """
+        Print the board
+        X for Black, O for White, . for empty
+        """
+        board = self.give_Board()
+        for row in board:
+            for col in row:
+                char = 'X' if col == 1 else ('O' if col == -1 else '.')
+                print (char, end=' ')
+            print()
+
     def reset(self):
         """ Reset the board """
 
