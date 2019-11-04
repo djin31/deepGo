@@ -3,8 +3,8 @@ Class containing the player which interacts with Monte-Carlo to learn and play t
 """
 
 import numpy as np
-from .montecarlo import MonteCarlo
-from .fnet import NeuralTrainer
+from montecarlo import MonteCarlo
+from fnet import NeuralTrainer
 
 class Player:
     """
@@ -32,6 +32,9 @@ class Player:
         batch = []
         for game in range(number_games):
             # Generate a game
+            print('\n\n\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
+            print ('GAME %d' % game)
+            print('#######################################################################3\n\n')
             simulator = MonteCarlo(self.board_size, self.fnet, self.mcts_sims) # Create a MCTS simulator
             game_batch = simulator.play_game()
             batch += game_batch
@@ -46,7 +49,7 @@ class Player:
                     self.fnet.save_model(checkpoint_path)
 
         # Train for remaining in the batch
-        if len(batch > 0):
+        if len(batch) > 0:
             self.fnet.train(batch, logging=logging, log_file=log_file)
             batch = [] # Empty the batch
 
@@ -57,6 +60,6 @@ class Player:
 
 if __name__ == '__main__':
     # Create a player
-    player = Player(13, 100, 10)
-    player.self_play(10, 'networks/testing1.model', logging=True, log_file='logs/log_testing1.txt')
+    player = Player(13, 10, 10)
+    player.self_play(3, 'networks/testing1.model', logging=True, log_file='logs/log_testing1.txt')
 

@@ -56,6 +56,7 @@ class GoEnv():
     def __init__(self, player_color, board_size):
         self.board_size = board_size
         self.history = np.zeros((HISTORY, board_size, board_size))
+        self.steps = [-1]
 
         colormap = {
             'black': pachi_py.BLACK,
@@ -98,10 +99,14 @@ class GoEnv():
         """ Executes an action for the current player """
 
         self.board = self.board.play(_action_to_coord(self.board, action), self.player_color)
+        self.steps.append(action)
         board = self.board.encode()
         color = self.player_color - 1
-        self.history = np.roll(history, 1, axis=0)
-        self.history[0] = np.array(board[color])
+        a = int(HISTORY/2-1)
+        for i in range(a):
+            self.history[(a-i)*2+color] = self.history[(a-1-i)*2+color]  
+#         self.history = np.roll(history, 1, axis=0)
+        self.history[color] = np.array(board[color])
         self.player_color = pachi_py.stone_other(self.player_color)
 
 
@@ -138,12 +143,21 @@ class GoEnv():
     def isComplete(self):
         return self.board.is_terminal
     
+    def stepsTaken(self):
+        return self.steps[1:]
+    
     def give_Board(self):
         board = self.board.encode()
         act_board = np.zeros(self.board_size**2,dtype = int).reshape(self.board_size,self.board_size)
         act_board[board[0]!=0] = 1
         act_board[board[1]!=0] = -1
         return act_board
+
+    def hash_state(self):
+        """
+        Unrolled list version of board
+        """
+        return ' '.join( [str(e) for e in self.give_Board().flatten()] )
 
     def print_board(self):
         """
@@ -199,12 +213,15 @@ class GoEnv():
             try:
                 self._act(action, self.history)
             except pachi_py.IllegalMove:
-                six.reraise(*sys.exc_info())
+                self._act(self.board_size**2,self.history)
+#                 six.reraise(*sys.exc_info())
 
         # Reward: if nonterminal, then the reward is -1
         if not self.board.is_terminal:
-            return _format_state(self.history, self.player_color, self.board_size), \
-                    0, False
+            if(self.steps[-1] == self.steps[-2] and self.steps[-1] == self.board_size**2):
+                return _format_state(self.history, self.player_color, self.board_size), self.get_Winner(), True
+            else: 
+                return _format_state(self.history, self.player_color, self.board_size), 0, False
 
         assert self.board.is_terminal
         self.done = True

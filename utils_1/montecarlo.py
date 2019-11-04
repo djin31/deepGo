@@ -8,8 +8,8 @@ Runs simulations and return a batch to update the neural network
 import numpy as np
 from scipy.special import softmax
 # from .game import Game
-from .goenv import GoEnv, create_env_copy
-from .fnet import NeuralTrainer
+from goenv import GoEnv, create_env_copy
+from fnet import NeuralTrainer
 
 class MonteCarlo:
     def __init__ (self, board_size, fnet : NeuralTrainer, max_sims : int = 20, tau_thres : int = 30):
@@ -46,6 +46,7 @@ class MonteCarlo:
         self.state.reset()
         root_state = True # Whether this is the first state
 
+        move_no = 1
         while not self.state.isComplete():
             # Print state
             self.state.print_board()
@@ -58,14 +59,17 @@ class MonteCarlo:
             # Compute the policy from the root node and add to the batch
             # Add dummy reward to the batch for now, update at end of game
             policy = self._compute_pi(self.state)
-            self.batch.append(self.state.get_history(), policy, 0)
+            self.batch.append((self.state.get_history(), policy, 0))
 
             # Update state
+            print("Move #%d" % move_no); move_no += 1
             self.play_move(policy[:], root_state=root_state)
             root_state = False
 
         # Update the reward and return the batch
         winner = -1 * self.state.get_winner()
+        print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&')
+        self.state.print_board()
         print ("And the winner is .... %s !" % ('White' if winner == -1 else 'Black'))
 
         for idx, (s, pi, r) in enumerate(self.batch):
@@ -75,17 +79,17 @@ class MonteCarlo:
 
         # Add the last terminal state to the batch
         policy = np.zeros(self.num_actions) # Do nothing
-        self.batch.append(self.state.get_history(), policy, 1)
+        self.batch.append((self.state.get_history(), policy, 1))
 
         return self.batch
 
     def _compute_pi(self, state):
         """
-        Compute the policy as a softmax over N(s,a)
+        Compute the policy proportional N(s,a)
         """
         # Get the board representation of state
-        s = state.give_Board()
-# 
+        s = state.hash_state()
+
         counts = np.array([self.Nsa[(s,a)] if (s,a) in self.Nsa else 0 for a in range(self.num_actions)])
 
         if self.tau_thres > 0:
@@ -108,10 +112,12 @@ class MonteCarlo:
         if root_state:
             noise = np.random.dirichlet(alpha=((0.3,)*self.num_actions))
             policy = 0.75 * policy + 0.25 * noise
-        a = np.random.choice(np.arange(1, self.board_size ** 2 + 1), p=policy)
+        print(policy.shape)
+        a = np.random.choice(np.arange(0, self.num_actions), p=policy)
         self.state.step(a)
+        print("Played %s" % a)
 
-    def run_simulator(self, state):
+    def run_simulator(self, state, terminal_state=False):
         """
         Run one iteration of the MCTS simulation from the 'root': state
         Fig. 2 of paper
@@ -120,15 +126,30 @@ class MonteCarlo:
         c. Update the path to the root with the value
         """
         # Get the board representation of state
-        s = state.give_Board()
+        s = state.hash_state()
         stack = state.get_history()
+
+        # print('============================================')
+        # print ('IN MCTS')
+        # state.print_board()
+        # # print (s)
+        # # if s in self.Ms:
+        # #     print ('not a leaf node')
+        # #     print (self.Ms[s])
+        # print ('------------------------------------------')
+
+        # print (s)
+        # print (self.Ts)
+        # print (self.Ps)
+        # print (self.Ns)
+        # print ('=======================================')
 
         if s not in self.Ts:
             self.Ts[s] = state.isComplete()
             if self.Ts[s]:
                 self.Ts[s] = -1 * state.player_turn() * state.get_winner()
 
-        if self.Ts[s] is not False:
+        if terminal_state or self.Ts[s] is not False:
             # This is a terminal state
             return -self.Ts[s]
 
@@ -164,19 +185,23 @@ class MonteCarlo:
                 # Taking Q(s,a) = 0 here
                 return self.cpuct * self.Ps[s][a] * np.sqrt(self.Ns[s] + 1e-8)
 
-        for a in valid_moves:
-            if a:
+        for a in range(self.num_actions):
+            if valid_moves[a]:
+                # print (a, end=' ')
                 value = get_Q_plus_U(s, a)
                 if value > best:
                     best = value
                     best_action = a
+        # print()
 
         # Play according to best action
         a = best_action
-        state.step(a)
+        # print (valid_moves)
+        # print ('Simulator: Going to play: %d' % a)
+        _, _, done = state.step(a)
 
         # Recursively call simulator on next state
-        v = self.run_simulator(state)
+        v = self.run_simulator(state, terminal_state=done)
 
         # Update Qsa
         if (s,a) in self.Qsa:
@@ -186,5 +211,5 @@ class MonteCarlo:
             self.Qsa[(s,a)] = v
             self.Nsa[(s,a)] = 1
 
-        self.Ns[(s,a)] += 1
+        self.Ns[s] += 1
         return -v
