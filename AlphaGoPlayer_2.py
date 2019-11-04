@@ -6,11 +6,11 @@ class AlphaGoPlayer():
         self.seed = seed
         self.player_color = player_color
 
-    def get_action(self, cur_state):
+    def get_action(self, cur_state, opponent_action):
         # Do Coolstuff using cur_state
         # Check illegal Move
-        print ('i am player 2')
-        return 169
-
+        print('-------------------------------------')
+        print('opponent_action: ' + str(opponent_action))
+        print('-------------------------------------')
         action = np.random.randint(0, 169)
         return action
