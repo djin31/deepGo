@@ -48,25 +48,67 @@ class Player:
 
             if ((game + 1) % self.batch_size == 0): 
                 # Time to update the network
-                self.fnet.train(batch, logging=logging, log_file=log_file)
+                self.update_network(batch, checkpoint_path=checkpoint_path, logging=logging, log_file=log_file)
                 batch = [] # Empty the batch
-
-                # Save the network
-                if checkpoint_path is not None:
-                    self.fnet.save_model(checkpoint_path)
 
         # Train for remaining in the batch
         if len(batch) > 0:
-            self.fnet.train(batch, logging=logging, log_file=log_file)
+            # Time to update the network
+            self.update_network(batch, checkpoint_path=checkpoint_path, logging=logging, log_file=log_file)
             batch = [] # Empty the batch
 
-            # Save the network
-            if checkpoint_path is not None:
-                self.fnet.save_model(checkpoint_path)
+    def update_network(self, batch, checkpoint_path=None, logging=True, log_file=None):
+        """
+        Update the weights of the network
+        """
+        new_batch = self._augment_batch(batch)
+        self.fnet.train(new_batch, logging=logging, log_file=log_file)
 
+        # Save the network
+        if checkpoint_path is not None:
+            self.fnet.save_model(checkpoint_path)
+
+    def _augment_batch(self, batch):
+        """
+        For each example in the batch, augment it with rotations and flips
+        """
+        new_batch = []
+        for (s, pi, r) in batch:
+            states = self._transform_state(s)
+            policies = self._transform_policy(pi)
+
+            for s_t, pi_t in zip(states, policies):
+                new_batch.append((s_t, pi_t, r))
+
+        return new_batch
+
+    def _transform_state(self, stack):
+        return self._produce_transformations(stack, threeD=True)
+
+    def _transform_policy(self, policy):
+        twoD_actions, pass_action = policy[0:-1].reshape(self.board_size, self.board_size), policy[-1] 
+
+        transforms = self._produce_transformations(twoD_actions)
+        return [
+            np.array(list(t.flatten()) + [pass_action])
+            for t in transforms
+        ]
+
+    def _produce_transformations(self, matrix, threeD=False):
+        if threeD:
+            axis = (1,2)
+        else:
+            axis = (0,1)
+            
+        matrices = []
+        for times in range(4):
+            mat = np.rot90(matrix, times, axis)
+            flipped_mat = np.flip(mat, 1)
+            matrices += [mat, flipped_mat]
+        return matrices
 
 if __name__ == '__main__':
     # Create a player
-    player = Player(13, 10, 10)
-    player.self_play(10, 'networks/testing1.model', logging=True, log_file='logs/log_testing1.txt')
+    player = Player(13, 100, 1, fnet='networks/testing1.model')
+    player.self_play(3, 'networks/testing2.model', logging=True, log_file='logs/log_testing1.txt')
 
