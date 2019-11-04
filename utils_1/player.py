@@ -6,6 +6,12 @@ import numpy as np
 from montecarlo import MonteCarlo
 from fnet import NeuralTrainer
 
+# from __future__ import print_function
+import sys
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
 class Player:
     """
     Self-play bot, generating thousands of MCTS games, and training the neural network
@@ -31,6 +37,7 @@ class Player:
         """
         batch = []
         for game in range(number_games):
+            eprint(game)
             # Generate a game
             print('\n\n\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
             print ('GAME %d' % game)
@@ -39,7 +46,7 @@ class Player:
             game_batch = simulator.play_game()
             batch += game_batch
 
-            if (game % number_games == 0): 
+            if ((game + 1) % self.batch_size == 0): 
                 # Time to update the network
                 self.fnet.train(batch, logging=logging, log_file=log_file)
                 batch = [] # Empty the batch
@@ -61,5 +68,5 @@ class Player:
 if __name__ == '__main__':
     # Create a player
     player = Player(13, 10, 10)
-    player.self_play(3, 'networks/testing1.model', logging=True, log_file='logs/log_testing1.txt')
+    player.self_play(10, 'networks/testing1.model', logging=True, log_file='logs/log_testing1.txt')
 

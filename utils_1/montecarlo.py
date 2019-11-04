@@ -62,18 +62,22 @@ class MonteCarlo:
             self.batch.append((self.state.get_history(), policy, 0))
 
             # Update state
+            a = self.state.get_legal_moves()
+            print(a[0:-1].reshape(self.board_size,self.board_size))
+            print(a[self.board_size**2])
             print("Move #%d" % move_no); move_no += 1
             self.play_move(policy[:], root_state=root_state)
             root_state = False
 
         # Update the reward and return the batch
+        print(self.state.stepsTaken())
         winner = -1 * self.state.get_winner()
         print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&')
         self.state.print_board()
         print ("And the winner is .... %s !" % ('White' if winner == -1 else 'Black'))
 
         for idx, (s, pi, r) in enumerate(self.batch):
-            player = s[16][0][0]
+            player = 1 if s[16][0][0] == 1 else -1
             r = winner * player
             self.batch[idx] = (s, pi, r)
 
@@ -89,8 +93,14 @@ class MonteCarlo:
         """
         # Get the board representation of state
         s = state.hash_state()
+        valid_moves = state.get_legal_moves()
 
         counts = np.array([self.Nsa[(s,a)] if (s,a) in self.Nsa else 0 for a in range(self.num_actions)])
+        counts *= valid_moves # Masking with valid moves
+
+        if sum(counts) == 0:
+            print("All counts had to be masked :( !!")
+            counts = valid_moves
 
         if self.tau_thres > 0:
             # Take action with proportional probabilities
@@ -106,13 +116,18 @@ class MonteCarlo:
         """
         Choose an action according to the policy from the current state
         Execute and go to the next state
-        If root_state==True, add Dirichlet noise
+        Add Dirichlet noise always if self.tau_thres > 0 (i.e. for first 30 moves)
         P(s, a) = (1 − e)pa + ena, where n ∼ Dir(0.03) and e = 0.25
         """
-        if root_state:
+        if self.tau_thres > 0:
             noise = np.random.dirichlet(alpha=((0.3,)*self.num_actions))
             policy = 0.75 * policy + 0.25 * noise
-        print(policy.shape)
+
+            valid_moves = self.state.get_legal_moves()
+            policy *= valid_moves; policy /= sum(policy)
+            
+        # print(policy[169],"jj")
+        print(self.num_actions)
         a = np.random.choice(np.arange(0, self.num_actions), p=policy)
         self.state.step(a)
         print("Played %s" % a)
@@ -149,9 +164,14 @@ class MonteCarlo:
             if self.Ts[s]:
                 self.Ts[s] = -1 * state.player_turn() * state.get_winner()
 
-        if terminal_state or self.Ts[s] is not False:
+        if self.Ts[s] is not False:
             # This is a terminal state
             return -self.Ts[s]
+
+        if terminal_state:
+            # This is a terminal state not observed before
+            val = -1 * state.player_turn() * state.get_winner()
+            return -val
 
         if s not in self.Ps:
             # Leaf node
@@ -164,7 +184,12 @@ class MonteCarlo:
             else:
                 print ('All valid moves had to be masked!!')
                 p = p + valid_moves
-                p /= np.sum(p)
+                if (np.sum(p) != 0):
+                    p /= np.sum(p)
+                else:
+                    print ('NO VALID MOVE POSSIBLE !!!!!!!!!')
+                    p = np.zeros(self.num_actions); p[self.num_actions - 1] = 1 # Pass
+                # p = 0
             
             self.Ms[s] = valid_moves
             self.Ps[s] = p

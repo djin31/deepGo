@@ -56,7 +56,7 @@ class GoEnv():
     def __init__(self, player_color, board_size):
         self.board_size = board_size
         self.history = np.zeros((HISTORY, board_size, board_size))
-        self.steps = [-1]
+        self.steps = [-1,-2]
 
         colormap = {
             'black': pachi_py.BLACK,
@@ -76,7 +76,7 @@ class GoEnv():
         if 14 <= board_size <= 19:
             return 7.5
         elif 9 <= board_size <= 13:
-            return 5.5
+            return 7.5
         return 0
     
 
@@ -88,10 +88,10 @@ class GoEnv():
 
         for pachi_move in legal_moves:
             move = _coord_to_action(self.board, pachi_move)
-#             if move != self.board_size ** 2 or self.test_move(move):
-            final_moves[move] = 1
-#         final_moves[self.board_size ** 2] = 1
-#         final_moves[self.board_size ** 2 + 1] = 1
+            if move != self.board_size ** 2 or self.test_move(move):
+                final_moves[move] = 1
+        if(np.sum(final_moves)==0):
+            final_moves[self.board_size**2] = 1 
         return final_moves
 
 
@@ -117,14 +117,13 @@ class GoEnv():
         the agent from passing if it makes him loose
         """
 
-        board_clone = self.board.clone()
-        current_score = board_clone.fast_score  + self.komi
+        # board_clone = self.board.clone()
+        current_score = self.board.fast_score  + self.komi
 
-        board_clone = board_clone.play(_action_to_coord(board_clone, action), self.player_color)
-        new_score = board_clone.fast_score + self.komi
+        # board_clone = board_clone.play(_action_to_coord(board_clone, action), self.player_color)
+        # new_score = board_clone.fast_score + self.komi
 
-        if self.player_color - 1 == 0 and new_score >= current_score \
-           or self.player_color - 1 == 1 and new_score <= current_score:
+        if self.player_color == 1 and current_score > 0 or self.player_color == 2 and current_score < 0:
            return False
         return True
 
@@ -141,10 +140,10 @@ class GoEnv():
         return _format_state(self.history, self.player_color, self.board_size)
     
     def isComplete(self):
-        return self.board.is_terminal
+        return (self.board.is_terminal or (self.steps[-1]==self.steps[-2] and self.steps[-1] == self.board_size**2))
     
     def stepsTaken(self):
-        return self.steps[1:]
+        return self.steps[2:]
     
     def give_Board(self):
         board = self.board.encode()
@@ -213,13 +212,14 @@ class GoEnv():
             try:
                 self._act(action, self.history)
             except pachi_py.IllegalMove:
+                # print("alalalalala")
                 self._act(self.board_size**2,self.history)
 #                 six.reraise(*sys.exc_info())
 
         # Reward: if nonterminal, then the reward is -1
         if not self.board.is_terminal:
             if(self.steps[-1] == self.steps[-2] and self.steps[-1] == self.board_size**2):
-                return _format_state(self.history, self.player_color, self.board_size), self.get_Winner(), True
+                return _format_state(self.history, self.player_color, self.board_size), self.get_winner(), True
             else: 
                 return _format_state(self.history, self.player_color, self.board_size), 0, False
 
