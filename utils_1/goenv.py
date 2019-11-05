@@ -156,7 +156,7 @@ class GoEnv():
         """
         Unrolled list version of board
         """
-        return ' '.join( [str(e) for e in self.give_Board().flatten()] )
+        return ' '.join( [str(e) for e in self.give_Board().flatten()] ), self.player_turn()
 
     def print_board(self):
         """
@@ -207,26 +207,28 @@ class GoEnv():
     def step(self, action):
         """ Perfoms an action and choose the winner if the 2 player
             have passed """
+        if(self.done==False):
+            if not self.done:
+                try:
+                    self._act(action, self.history)
+                except pachi_py.IllegalMove:
+                    # print("alalalalala")
+#                     self._act(self.board_size**2,self.history)
+                    six.reraise(*sys.exc_info())
 
-        if not self.done:
-            try:
-                self._act(action, self.history)
-            except pachi_py.IllegalMove:
-                # print("alalalalala")
-                self._act(self.board_size**2,self.history)
-#                 six.reraise(*sys.exc_info())
+            # Reward: if nonterminal, then the reward is -1
+            if not self.board.is_terminal:
+                if(self.steps[-1] == self.steps[-2] and self.steps[-1] == self.board_size**2):
+                    return _format_state(self.history, self.player_color, self.board_size), self.get_winner(), True
+                else: 
+                    return _format_state(self.history, self.player_color, self.board_size), 0, False
 
-        # Reward: if nonterminal, then the reward is -1
-        if not self.board.is_terminal:
-            if(self.steps[-1] == self.steps[-2] and self.steps[-1] == self.board_size**2):
-                return _format_state(self.history, self.player_color, self.board_size), self.get_winner(), True
-            else: 
-                return _format_state(self.history, self.player_color, self.board_size), 0, False
-
-        assert self.board.is_terminal
-        self.done = True
-        reward = self.get_winner()
-        return _format_state(self.history, self.player_color, self.board_size), reward, True
+            assert self.board.is_terminal
+            self.done = True
+            reward = self.get_winner()
+            return _format_state(self.history, self.player_color, self.board_size), reward, True
+        else:
+            raise ValueError("Game has ended")
 
 
     def __deepcopy__(self, memo):
@@ -248,6 +250,7 @@ def create_env_copy (Env):
     newEnv.reset()
     newEnv.history = deepcopy(Env.history)
     newEnv.player_color = deepcopy(Env.player_color)
+    newEnv.steps = deepcopy(Env.steps)
     newEnv.state = _format_state(newEnv.history,newEnv.player_color, newEnv.board_size)
     newEnv.board = Env.give_Board_Copy()
     newEnv.done = deepcopy(Env.done)
