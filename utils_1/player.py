@@ -3,8 +3,10 @@ Class containing the player which interacts with Monte-Carlo to learn and play t
 """
 
 import numpy as np
+import traceback
 from montecarlo import MonteCarlo
 from fnet import NeuralTrainer
+import time
 
 # from __future__ import print_function
 import sys
@@ -36,20 +38,30 @@ class Player:
         Generate games from self-play and update the network
         """
         batch = []
+        start_time = time.time()
         for game in range(number_games):
-            eprint(game)
             # Generate a game
             print('\n\n\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
             print ('GAME %d' % game)
             print('#######################################################################3\n\n')
-            simulator = MonteCarlo(self.board_size, self.fnet, self.mcts_sims) # Create a MCTS simulator
-            game_batch = simulator.play_game()
-            batch += game_batch
+            try:
+                simulator = MonteCarlo(self.board_size, self.fnet, self.mcts_sims) # Create a MCTS simulator
+                game_batch = simulator.play_game()
+                batch += game_batch
 
-            if ((game + 1) % self.batch_size == 0): 
-                # Time to update the network
-                self.update_network(batch, checkpoint_path=checkpoint_path, logging=logging, log_file=log_file)
-                batch = [] # Empty the batch
+                if ((game + 1) % self.batch_size == 0): 
+                    # Time to update the network
+                    self.update_network(batch, checkpoint_path=checkpoint_path, logging=logging, log_file=log_file)
+                    batch = [] # Empty the batch
+            except:
+                tb = traceback.format_exc()
+            else:
+                tb = "No error"
+            finally:
+                end_time = time.time()
+                eprint("GAME # %d | Time Taken: %.3f secs" % (game, end_time - start_time))
+                eprint(tb)
+                start_time = end_time
 
         # Train for remaining in the batch
         if len(batch) > 0:
@@ -109,6 +121,6 @@ class Player:
 
 if __name__ == '__main__':
     # Create a player
-    player = Player(13, 100, 1, fnet='networks/testing1.model')
-    player.self_play(3, 'networks/testing2.model', logging=True, log_file='logs/log_testing1.txt')
+    player = Player(13, 200, 1)
+    player.self_play(10, 'networks/testing2.model', logging=True, log_file='logs/log_testing2.txt')
 

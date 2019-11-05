@@ -80,7 +80,7 @@ class GoEnv():
         return 0
     
 
-    def get_legal_moves(self):
+    def get_legal_moves(self, avoid_dumb_passes=True):
         """ Get all the legal moves and transform their coords into 1d """
 
         legal_moves = self.board.get_legal_coords(self.player_color, filter_suicides=True)
@@ -88,7 +88,7 @@ class GoEnv():
 
         for pachi_move in legal_moves:
             move = _coord_to_action(self.board, pachi_move)
-            if move != self.board_size ** 2 or self.test_move(move):
+            if not avoid_dumb_passes or move != self.board_size ** 2 or self.test_move(move):
                 final_moves[move] = 1
         if(np.sum(final_moves)==0):
             final_moves[self.board_size**2] = 1 
@@ -169,6 +169,13 @@ class GoEnv():
                 char = 'X' if col == 1 else ('O' if col == -1 else '.')
                 print (char, end=' ')
             print()
+
+    def get_empty(self):
+        """
+        Returns number of empty positions in the board
+        """
+        board = self.give_Board()
+        return np.sum(board == 0)
 
     def reset(self):
         """ Reset the board """

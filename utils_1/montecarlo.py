@@ -10,6 +10,7 @@ from scipy.special import softmax
 # from .game import Game
 from goenv import GoEnv, create_env_copy
 from fnet import NeuralTrainer
+import traceback
 
 class MonteCarlo:
     def __init__ (self, board_size, fnet : NeuralTrainer, max_sims : int = 20, tau_thres : int = 30):
@@ -25,7 +26,6 @@ class MonteCarlo:
         self.cpuct = 1.5
         self.tau_thres = tau_thres # For how many moves to use the temperature parameter
         self.pass_invalid_thres = int(self.num_actions * 1 / 3) # Do not allow pass if >= these many positions are empty
-        # self.moves_executed = 0 # How many moves have already been played
 
         # Set of (s, pi, r) tuples
         # s here is the complete 17*13*13 state
@@ -59,8 +59,14 @@ class MonteCarlo:
             for _sim in range(self.max_sims):
                 # print ('*****************************************************************')
                 # print ('Sim #%d' % _sim)
-                start_state = create_env_copy(self.state)
-                self.run_simulator(start_state)
+                try:
+                    start_state = create_env_copy(self.state)
+                    self.run_simulator(start_state)
+                except:
+                    print('@@@@@@@@@@@@@@@@@@@@@@@@@@@@2@@@@@@@@')
+                    print ("BAD SIMULATION! EXCEPTION OCCURED")
+                    tb = traceback.format_exc()
+                    print (tb)
 
             # Compute the policy from the root node and add to the batch
             # Add dummy reward to the batch for now, update at end of game
@@ -68,9 +74,6 @@ class MonteCarlo:
             self.batch.append((self.state.get_history(), policy, 0))
 
             # Update state
-            # a = self.state.get_legal_moves()
-            # print(a[0:-1].reshape(self.board_size,self.board_size))
-            # print(a[self.board_size**2])
             print("Move #%d" % move_no); move_no += 1
             self.play_move(policy[:], root_state=root_state)
             root_state = False
@@ -103,6 +106,12 @@ class MonteCarlo:
             valid_moves[-1] = 0 # No passing around!
         return valid_moves
 
+    def _get_box_representation(self, moves):
+        """
+        Represent in a box representation for printing
+        """
+        return moves[0:-1].reshape(self.board_size, self.board_size), moves[-1]
+
     def _compute_pi(self, state):
         """
         Compute the policy proportional N(s,a)
@@ -112,8 +121,8 @@ class MonteCarlo:
         valid_moves = self._get_legal_moves(state)
 
         counts = np.array([self.Nsa[(s,a)] if (s,a) in self.Nsa else 0 for a in range(self.num_actions)])
-        print ('counts:');print (counts[0:-1].reshape(self.board_size, self.board_size), counts[-1]); print (sum(counts))
-        print('valid_moves:');print (valid_moves[0:-1].reshape(self.board_size, self.board_size), valid_moves[-1])
+        print ('counts:');print (self._get_box_representation(counts)); print (sum(counts))
+        print('valid_moves:');print (self._get_box_representation(valid_moves))
         counts *= valid_moves # Masking with valid moves
 
         if np.sum(counts) == 0:
@@ -144,8 +153,6 @@ class MonteCarlo:
             valid_moves = self._get_legal_moves(self.state)
             policy *= valid_moves; policy /= np.sum(policy)
 
-        # print(policy[169],"jj")
-        print(self.num_actions)
         a = np.random.choice(np.arange(0, self.num_actions), p=policy)
         self.state.step(a)
         print("Played %s" % a)
@@ -163,39 +170,12 @@ class MonteCarlo:
         s = state.hash_state()
         stack = state.get_history()
 
-        # print(s)
-
-        # state.print_board()
-        # print('.......................................................................')
-
-        # print('============================================')
-        # print ('IN MCTS')
-        # state.print_board()
-        # # print (s)
-        # # if s in self.Ms:
-        # #     print ('not a leaf node')
-        # #     print (self.Ms[s])
-        # print ('------------------------------------------')
-
-        # print (s)
-        # print (self.Ts)
-        # print (self.Ps)
-        # print (self.Ns)
-        # print ('=======================================')
-
         if s not in self.Ts:
             self.Ts[s] = state.isComplete()
             if self.Ts[s]:
                 self.Ts[s] = -1 * state.player_turn() * state.get_winner()
 
         if self.Ts[s] == 1 or self.Ts[s] == -1:
-            # print ('hobaod')
-            # print (s)
-            # print (self.Ts[s], type(self.Ts[s]))
-            # print (self.Ts[s] is not False)
-            # a = np.bool(False)
-            # print (False is not False)
-            # print (a is not False)
             # This is a terminal state
             return -self.Ts[s]
 
@@ -220,7 +200,6 @@ class MonteCarlo:
                 else:
                     print ('NO VALID MOVE POSSIBLE !!!!!!!!!')
                     p = np.zeros(self.num_actions); p[self.num_actions - 1] = 1 # Pass
-                # p = 0
             
             self.Ms[s] = valid_moves
             self.Ps[s] = p
@@ -229,42 +208,60 @@ class MonteCarlo:
             return -v
 
         # Pick the action with highest confidance bound
-        # valid_moves = self._get_legal_moves(state)
-        valid_moves = self.Ms[s]
-        best = -float('inf')
-        best_action = -1
+        def pick_action():
+            valid_moves = self.Ms[s]
+            best = -float('inf')
+            best_action = -1
 
-        def get_Q_plus_U(s, a):
-            if (s,a) in self.Qsa:
-                return self.Qsa[(s,a)] + \
-                        self.cpuct * self.Ps[s][a] * np.sqrt(self.Ns[s]) / (1 + self.Nsa[(s,a)])
-            else:
-                # Taking Q(s,a) = 0 here
-                return self.cpuct * self.Ps[s][a] * np.sqrt(self.Ns[s] + 1e-8)
+            def get_Q_plus_U(s, a):
+                if (s,a) in self.Qsa:
+                    return self.Qsa[(s,a)] + \
+                            self.cpuct * self.Ps[s][a] * np.sqrt(self.Ns[s]) / (1 + self.Nsa[(s,a)])
+                else:
+                    # Taking Q(s,a) = 0 here
+                    return self.cpuct * self.Ps[s][a] * np.sqrt(self.Ns[s] + 1e-8)
 
-        for a in range(self.num_actions):
-            if valid_moves[a]:
-                # print (a, end=' ')
-                value = get_Q_plus_U(s, a)
-                if value > best:
-                    best = value
-                    best_action = a
+            for a in range(self.num_actions):
+                if valid_moves[a]:
+                    # print (a, end=' ')
+                    value = get_Q_plus_U(s, a)
+                    if value > best:
+                        best = value
+                        best_action = a
 
-        # p2, p1 = self.Ps[s][0:-1].reshape(self.board_size, self.board_size), self.Ps[s][-1]
-        # print (p2); print(p1)
+            return best_action
 
-        # values = np.array([get_Q_plus_U(s,a) if valid_moves[a] else -1 for a in range(self.num_actions)])
-        # val2, val = values[0:-1].reshape(self.board_size, self.board_size), values[-1]
+        def play_next():
+            if (s[1] != state.player_turn()):
+                print ('########################## OOOOOOOOOOOOO #########################')
+                print (s[1])
+                print (state.player_turn())
+                print ('##################################################################')
+            try:
+                a = pick_action()
+                _, _, done = state.step(a)
+                return a, done
+            except:
+                # Some error occurred in taking the move => Print the state and valid moves
+                print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
+                print ('FOR SOME MYSTICAL REASON THIS MOVE HAS BECOME INVALID!!!')
+                print ('Move Taken:', a)
+                print ('Player: %d' % state.player_turn())
+                print ('Assumed player: %d' % s[1])
+                print ('Hashed Board: ', s[0])
+                print ('Hashed Board: ', np.array(s[0].split(' ')).reshape(self.board_size, self.board_size) )
+                state.print_board()
+                valid_moves = self.Ms[s]
+                print (self._get_box_representation(valid_moves))
+                actual_valid_moves = self._get_legal_moves(state)
+                print (self._get_box_representation(actual_valid_moves))
+                print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
 
-        # print (val2); print(val)
-        # print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-        # print()
+                self.Ms[s][a] = 0 # Make this move invalid
+                return play_next()
 
         # Play according to best action
-        a = best_action
-        # print (valid_moves)
-        # print ('Simulator: Going to play: %d' % a)
-        _, _, done = state.step(a)
+        a, done = play_next()
 
         # Recursively call simulator on next state
         v = self.run_simulator(state, terminal_state=done)
