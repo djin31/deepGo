@@ -11,6 +11,7 @@ from scipy.special import softmax
 from goenv import GoEnv, create_env_copy
 from fnet import NeuralTrainer
 import traceback
+import time
 
 class MonteCarlo:
     def __init__ (self, board_size, fnet : NeuralTrainer, max_sims : int = 20, tau_thres : int = 30):
@@ -52,11 +53,16 @@ class MonteCarlo:
 
         move_no = 1
         while move_no <= 450 and not self.state.isComplete():
+            # Catch your breath
+            time.sleep(0.05)
+
             # Print state
             self.state.print_board()
             print ('-----------------------------------------------------------------')
             # Perform a simulation on the COPY of current state
             for _sim in range(self.max_sims):
+                # Catch your breath
+                time.sleep(0.05 / self.max_sims)
                 # print ('*****************************************************************')
                 # print ('Sim #%d' % _sim)
                 try:
@@ -146,7 +152,7 @@ class MonteCarlo:
         Add Dirichlet noise always if self.tau_thres > 0 (i.e. for first 30 moves)
         P(s, a) = (1 − e)pa + ena, where n ∼ Dir(0.03) and e = 0.25
         """
-        if self.tau_thres > 0:
+        if root_state:
             noise = np.random.dirichlet(alpha=((0.3,)*self.num_actions))
             policy = 0.75 * policy + 0.25 * noise
 

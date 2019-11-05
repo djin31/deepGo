@@ -6,7 +6,7 @@ import numpy as np
 import traceback
 from montecarlo import MonteCarlo
 from fnet import NeuralTrainer
-import time
+import time, os
 
 # from __future__ import print_function
 import sys
@@ -40,6 +40,11 @@ class Player:
         batch = []
         start_time = time.time()
         for game in range(number_games):
+            # Catch your breath
+            time.sleep(5)
+
+            checkpoint_file = os.path.join(checkpoint_path, 'net%d.model' % game)
+
             # Generate a game
             print('\n\n\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
             print ('GAME %d' % game)
@@ -51,7 +56,7 @@ class Player:
 
                 if ((game + 1) % self.batch_size == 0): 
                     # Time to update the network
-                    self.update_network(batch, checkpoint_path=checkpoint_path, logging=logging, log_file=log_file)
+                    self.update_network(batch, checkpoint_path=checkpoint_file, logging=logging, log_file=log_file)
                     batch = [] # Empty the batch
             except:
                 tb = traceback.format_exc()
@@ -66,7 +71,7 @@ class Player:
         # Train for remaining in the batch
         if len(batch) > 0:
             # Time to update the network
-            self.update_network(batch, checkpoint_path=checkpoint_path, logging=logging, log_file=log_file)
+            self.update_network(batch, checkpoint_path=checkpoint_file, logging=logging, log_file=log_file)
             batch = [] # Empty the batch
 
     def update_network(self, batch, checkpoint_path=None, logging=True, log_file=None):
@@ -122,5 +127,5 @@ class Player:
 if __name__ == '__main__':
     # Create a player
     player = Player(13, 200, 1)
-    player.self_play(10, 'networks/testing2.model', logging=True, log_file='logs/log_testing2.txt')
+    player.self_play(5000, 'networks/', logging=True, log_file='logs/overnight5Nov.txt')
 
