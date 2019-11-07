@@ -7,6 +7,8 @@ import traceback
 from montecarlo import MonteCarlo
 from fnet import NeuralTrainer
 import time, os
+from joblib import Parallel, delayed
+import random
 
 # from __future__ import print_function
 import sys
@@ -18,7 +20,7 @@ class Player:
     """
     Self-play bot, generating thousands of MCTS games, and training the neural network
     """
-    def __init__ (self, board_size=13, mcts_sims=100, batch_size=10, fnet=None):
+    def __init__ (self, board_size=13, mcts_sims=100, batch_size=6, fnet=None):
         """
         Initialize the Player class, instantiating the monte-carlo and Fnetwork
         """
@@ -37,11 +39,10 @@ class Player:
         """
         Generate games from self-play and update the network
         """
-        batch = []
-        start_time = time.time()
-        for game in range(number_games):
+        num_times = int(np.ceil(number_games / self.batch_size))
+        for game in range(num_times):
             # Catch your breath
-            time.sleep(5)
+            time.sleep(1)
 
             checkpoint_file = os.path.join(checkpoint_path, 'net%d.model' % game)
 
@@ -49,37 +50,47 @@ class Player:
             print('\n\n\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
             print ('GAME %d' % game)
             print('#######################################################################3\n\n')
-            try:
-                simulator = MonteCarlo(self.board_size, self.fnet, self.mcts_sims) # Create a MCTS simulator
-                game_batch = simulator.play_game()
-                batch += game_batch
 
-                if ((game + 1) % self.batch_size == 0): 
-                    # Time to update the network
-                    self.update_network(batch, checkpoint_path=checkpoint_file, logging=logging, log_file=log_file)
-                    batch = [] # Empty the batch
-            except:
-                tb = traceback.format_exc()
-            else:
-                tb = "No error"
-            finally:
-                end_time = time.time()
-                eprint("GAME # %d | Time Taken: %.3f secs" % (game, end_time - start_time))
-                eprint(tb)
-                start_time = end_time
+            def generate_batch ():
+                game_batch = []
+                try:
+                    eprint ("instantiating sim")
+                    simulator = MonteCarlo(self.board_size, self.fnet, self.mcts_sims) # Create a MCTS simulator
+                    game_batch = simulator.play_game()
+                    # return game_batch
+                    # batch += game_batch
+                except:
+                    tb = traceback.format_exc()
+                else:
+                    tb = "No error"
+                finally:
+                    eprint(tb)
+                    return game_batch
 
-        # Train for remaining in the batch
-        if len(batch) > 0:
-            # Time to update the network
+            start_time = time.time()
+            games_batch = Parallel(n_jobs=self.batch_size)(delayed(generate_batch)() for _i in range(self.batch_size))
+            batch = [b for gb in games_batch for b in gb]
+            random.shuffle(batch)
+            end_time = time.time()
+            eprint("GAME # %d | Time Taken: %.3f secs" % (game * self.batch_size, end_time - start_time))
+
+            # Update the network
+            time.sleep(1) # Have some rest and collect some of your garbage in the meantime
             self.update_network(batch, checkpoint_path=checkpoint_file, logging=logging, log_file=log_file)
-            batch = [] # Empty the batch
+
+    def _chunks(self, l, n):
+        """Yield successive n-sized chunks from l."""
+        for i in range(0, len(l), n):
+            yield l[i:i + n]
 
     def update_network(self, batch, checkpoint_path=None, logging=True, log_file=None):
         """
         Update the weights of the network
         """
         new_batch = self._augment_batch(batch)
-        self.fnet.train(new_batch, logging=logging, log_file=log_file)
+        random.shuffle(new_batch)
+        for chunk in self._chunks(new_batch, 2048):
+            self.fnet.train(chunk, logging=logging, log_file=log_file)
 
         # Save the network
         if checkpoint_path is not None:
@@ -126,6 +137,6 @@ class Player:
 
 if __name__ == '__main__':
     # Create a player
-    player = Player(13, 200, 1)
-    player.self_play(5000, 'networks/', logging=True, log_file='logs/overnight5Nov.txt')
+    player = Player(13, 200, 10)
+    player.self_play(500, '6nov/', logging=True, log_file='6nov/training_log.txt')
 

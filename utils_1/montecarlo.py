@@ -52,7 +52,7 @@ class MonteCarlo:
         root_state = True # Whether this is the first state
 
         move_no = 1
-        while move_no <= 450 and not self.state.isComplete():
+        while move_no <= 200 and not self.state.isComplete():
             # Catch your breath
             time.sleep(0.05)
 
@@ -245,6 +245,8 @@ class MonteCarlo:
                 print ('##################################################################')
             try:
                 a = pick_action()
+                if a < 0 or a >= self.num_actions:
+                    a = self.num_actions - 1 # pass
                 _, _, done = state.step(a)
                 return a, done
             except:
