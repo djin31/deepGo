@@ -113,7 +113,7 @@ class NeuralTrainer():
         self.lr = lr
         self.epochs = epochs
         self.batch_size = batch_size
-        self.value_crit = torch.nn.MSELoss()
+        self.value_crit = torch.nn.MSELoss(reduction="mean")
         
         self.cuda_flag = torch.cuda.is_available()
         if self.cuda_flag:
@@ -122,7 +122,7 @@ class NeuralTrainer():
     def train(self, examples, logging=True, log_file=None):
         '''examples is list containing (state, policy, value)'''
         
-        opt = torch.optim.Adam(self.net.parameters())
+        opt = torch.optim.Adam(self.net.parameters(), weight_decay=1e-4)
         self.net.train()
         states = torch.Tensor([x[0] for x in examples])
         policies = torch.Tensor([x[1] for x in examples])
@@ -132,13 +132,15 @@ class NeuralTrainer():
         policy_loss = 0
         value_loss = 0
         for epoch in range(self.epochs):
+            policy_loss = 0
+            value_loss = 0
             for s,pi,v in train_loader:
                 if self.cuda_flag:
                     s,pi,v = s.contiguous().cuda(), pi.contiguous().cuda(), v.contiguous().cuda()
                 
                 pred_pi, pred_v = self.net(s)
                 
-                pi_loss =  -torch.sum(pred_pi*pi)/pi.numel() # this loss calculates how closely the two policies match
+                pi_loss =  -torch.sum(torch.log(pred_pi)*pi)/pi.size(0) # this loss calculates how closely the two policies match
                 val_loss = self.value_crit(pred_v.view(-1), v)
                 
                 policy_loss+=pi_loss.item()
@@ -149,12 +151,17 @@ class NeuralTrainer():
                 opt.zero_grad()
                 total_loss.backward()
                 opt.step()
-        if logging:
-            print("Policy Loss:{} Value Loss:{}".format(policy_loss, value_loss))
+            if logging:
+                print("Epoch:{} Policy Loss:{} Value Loss:{}".format(epoch, policy_loss, value_loss))
+        
+            if log_file is not None:
+                with open(log_file, 'a') as f:
+                    timestamp = str(datetime.datetime.now()).split('.')[0]
+                    f.write("{} | Epoch:{} Policy Loss:{} Value Loss:{}\n".format(timestamp, epoch, policy_loss, value_loss))
+
         if log_file is not None:
             with open(log_file, 'a') as f:
-                timestamp = str(datetime.datetime.now()).split('.')[0]
-                f.write("{} | Policy Loss:{} Value Loss:{}\n".format(timestamp, policy_loss, value_loss))
+                f.write('\n') # An extra space after each training
 
         return policy_loss, value_loss
     
@@ -176,45 +183,3 @@ class NeuralTrainer():
     
     def load_model(self, checkpoint_path):
         self.net.load_state_dict(torch.load(checkpoint_path))
-
-
-# class FNet:
-#     def __init__ (self, board_size, load_net=None):
-#         # Initialize the network
-#         self.board_size = board_size
-#         self.pass_action = board_size * board_size
-#         self.total_actions = board_size * board_size + 1
-#         self.board_shape = (board_size, board_size)
-
-#         # ... other stuff
-#         if load_net:
-#             self.load_network(load_net)
-
-#     def load_network(self, infile):
-#         # Load the network from a file
-#         with open(infile, 'rb') as f:
-#             print ('Loaded')
-
-#     def dump_network(self, outfile):
-#         # Dump the network in a file for future use
-#         with open(outfile, 'wb') as f:
-#             print ('Dumped')
-
-#     def foward_pass(self, state):
-#         # Doing forward pass through the FNet
-#         assert (state.shape == self.board_shape)
-
-#         value = np.random.rand() * 2 - 1
-#         policy = [np.random.rand() for i in range(0, self.total_actions)]
-#         policy = np.array(policy / sum(policy))
-
-#         return value, policy
-
-#     def update_net(self, batch):
-#         # Batch will be an array of (s, pi, r) tuples
-#         # s : State - 2D numpy array of shape self.board_size
-#         # pi : Policy values - 1D numpy array of size self.actions
-#         # r : +1, 0, -1 depending on whether white won
-
-#         pass
-        
