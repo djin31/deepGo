@@ -52,17 +52,16 @@ class MonteCarlo:
         root_state = True # Whether this is the first state
 
         move_no = 1
-        while move_no <= 200 and not self.state.isComplete():
+        while move_no <= 450 and not self.state.isComplete():
             # Catch your breath
-            time.sleep(0.05)
+            # time.sleep(0.05)
 
             # Print state
             self.state.print_board()
             print ('-----------------------------------------------------------------')
             # Perform a simulation on the COPY of current state
             for _sim in range(self.max_sims):
-                # Catch your breath
-                time.sleep(0.05 / self.max_sims)
+                time.sleep(0.05 / self.max_sims) # Catch your breath
                 # print ('*****************************************************************')
                 # print ('Sim #%d' % _sim)
                 try:
@@ -73,6 +72,7 @@ class MonteCarlo:
                     print ("BAD SIMULATION! EXCEPTION OCCURED")
                     tb = traceback.format_exc()
                     print (tb)
+                time.sleep(0.05 / self.max_sims) # Catch your breath
 
             # Compute the policy from the root node and add to the batch
             # Add dummy reward to the batch for now, update at end of game
@@ -214,7 +214,7 @@ class MonteCarlo:
             return -v
 
         # Pick the action with highest confidance bound
-        def pick_action():
+        def pick_action(s):
             valid_moves = self.Ms[s]
             best = -float('inf')
             best_action = -1
@@ -237,14 +237,16 @@ class MonteCarlo:
 
             return best_action
 
-        def play_next():
+        def play_next(state):
+            s = state.hash_state()
+
             if (s[1] != state.player_turn()):
                 print ('########################## OOOOOOOOOOOOO #########################')
                 print (s[1])
                 print (state.player_turn())
                 print ('##################################################################')
             try:
-                a = pick_action()
+                a = pick_action(s)
                 if a < 0 or a >= self.num_actions:
                     a = self.num_actions - 1 # pass
                 _, _, done = state.step(a)
@@ -253,23 +255,23 @@ class MonteCarlo:
                 # Some error occurred in taking the move => Print the state and valid moves
                 print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
                 print ('FOR SOME MYSTICAL REASON THIS MOVE HAS BECOME INVALID!!!')
-                print ('Move Taken:', a)
-                print ('Player: %d' % state.player_turn())
-                print ('Assumed player: %d' % s[1])
-                print ('Hashed Board: ', s[0])
-                print ('Hashed Board: ', np.array(s[0].split(' ')).reshape(self.board_size, self.board_size) )
-                state.print_board()
-                valid_moves = self.Ms[s]
-                print (self._get_box_representation(valid_moves))
-                actual_valid_moves = self._get_legal_moves(state)
-                print (self._get_box_representation(actual_valid_moves))
+                # print ('Move Taken:', a)
+                # print ('Player: %d' % state.player_turn())
+                # print ('Assumed player: %d' % s[1])
+                # print ('Hashed Board: ', s[0])
+                # print ('Hashed Board: ', np.array(s[0].split(' ')).reshape(self.board_size, self.board_size) )
+                # state.print_board()
+                # valid_moves = self.Ms[s]
+                # print (self._get_box_representation(valid_moves))
+                # actual_valid_moves = self._get_legal_moves(state)
+                # print (self._get_box_representation(actual_valid_moves))
                 print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
 
                 self.Ms[s][a] = 0 # Make this move invalid
-                return play_next()
+                return play_next(state)
 
         # Play according to best action
-        a, done = play_next()
+        a, done = play_next(state)
 
         # Recursively call simulator on next state
         v = self.run_simulator(state, terminal_state=done)
