@@ -52,7 +52,13 @@ class MonteCarlo:
         root_state = True # Whether this is the first state
 
         move_no = 1
-        while move_no <= 450 and not self.state.isComplete():
+        while move_no <= 350 and not self.state.isComplete():
+            print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
+            print ('move #%d'%move_no)
+            print (len(self.Ns))
+            print (len(self.Qsa))
+            print (len(self.Ms))
+            print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
             # Catch your breath
             # time.sleep(0.05)
 
@@ -61,7 +67,7 @@ class MonteCarlo:
             print ('-----------------------------------------------------------------')
             # Perform a simulation on the COPY of current state
             for _sim in range(self.max_sims):
-                time.sleep(0.05 / self.max_sims) # Catch your breath
+                # time.sleep(0.05 / self.max_sims) # Catch your breath
                 # print ('*****************************************************************')
                 # print ('Sim #%d' % _sim)
                 try:
@@ -79,7 +85,7 @@ class MonteCarlo:
             policy = self._compute_pi(self.state)
             self.batch.append((self.state.get_history(), policy, 0))
 
-            # Update state
+            # Update state and delete not-needed tree
             print("Move #%d" % move_no); move_no += 1
             self.play_move(policy[:], root_state=root_state)
             root_state = False
@@ -127,7 +133,7 @@ class MonteCarlo:
         valid_moves = self._get_legal_moves(state)
 
         counts = np.array([self.Nsa[(s,a)] if (s,a) in self.Nsa else 0 for a in range(self.num_actions)])
-        print ('counts:');print (self._get_box_representation(counts)); print (sum(counts))
+        print ('counts (%d):'%sum(counts));print (self._get_box_representation(counts))
         print('valid_moves:');print (self._get_box_representation(valid_moves))
         counts *= valid_moves # Masking with valid moves
 
@@ -161,6 +167,7 @@ class MonteCarlo:
 
         a = np.random.choice(np.arange(0, self.num_actions), p=policy)
         self.state.step(a)
+        print('policy: (%d)' % sum(policy)); print (self._get_box_representation(policy))
         print("Played %s" % a)
 
     def run_simulator(self, state, terminal_state=False):
@@ -250,7 +257,7 @@ class MonteCarlo:
                 if a < 0 or a >= self.num_actions:
                     a = self.num_actions - 1 # pass
                 _, _, done = state.step(a)
-                return a, done
+                return s, a, done
             except:
                 # Some error occurred in taking the move => Print the state and valid moves
                 print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
@@ -271,7 +278,8 @@ class MonteCarlo:
                 return play_next(state)
 
         # Play according to best action
-        a, done = play_next(state)
+        s, a, done = play_next(state)
+        child_s = state.hash_state()
 
         # Recursively call simulator on next state
         v = self.run_simulator(state, terminal_state=done)
