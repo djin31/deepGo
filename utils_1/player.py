@@ -10,7 +10,9 @@ import time, os
 from joblib import Parallel, delayed
 import random
 import pickle
+import math
 from tqdm import tqdm
+import gc
 
 
 # from __future__ import print_function
@@ -19,10 +21,31 @@ import sys
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
-# def generate_game_batch ():
-#     """
-#     A function independent of the big structures of the Player class
-#     """
+def generate_game_batch (board_size, fnet, mcts_sims, num_games):
+    """
+    A function independent of the big structures of the Player class
+    """
+
+    def play_game(board_size, fnet, mcts_sims):
+        """
+        Generate a single game and batch
+        """
+        game_batch = []
+        try:
+            eprint ("instantiating sim")
+            simulator = MonteCarlo(board_size, fnet, mcts_sims) # Create a MCTS simulator
+            game_batch = simulator.play_game()
+        except:
+            tb = traceback.format_exc()
+        else:
+            tb = "No error"
+        finally:
+            eprint(tb)
+            return game_batch
+
+    games_batch = Parallel(n_jobs=num_games)(delayed(play_game)(board_size, fnet, mcts_sims) for i in range(num_games))
+    batch = [b for gb in games_batch for b in gb]
+    return batch
 
 
 class Player:
@@ -38,14 +61,13 @@ class Player:
         self.num_games = num_games # Update the network after generating these many number of games
         self.batch_size = batch_size # Size of the running batch
         self.running_batch_file = running_batch_file # File for loading and saving the running file
-        if load_running_batch:
-            with open(self.running_batch_file, 'rb') as f:
-                self.running_batch = pickle.load(f) # Running batch for training
-        else:
-            self.running_batch = [] # Running batch for training
+        if not load_running_batch:
+            # Put an empty batch inside the file
+            with open(self.running_batch_file, 'wb') as f:
+                pickle.dump([], f)
 
         # Create the network
-        self.fnet = NeuralTrainer(10, board_size, epochs=5)
+        self.fnet = NeuralTrainer(10, board_size, epochs=5, batch_size=128)
         if fnet is not None:
             # Load the network from the file
             self.fnet.load_model(fnet)
@@ -68,35 +90,21 @@ class Player:
             print ('GAME %d' % game)
             print('#######################################################################3\n\n')
 
-            def generate_batch ():
-                game_batch = []
-                try:
-                    eprint ("instantiating sim")
-                    simulator = MonteCarlo(self.board_size, self.fnet, self.mcts_sims) # Create a MCTS simulator
-                    game_batch = simulator.play_game()
-                except:
-                    tb = traceback.format_exc()
-                else:
-                    tb = "No error"
-                finally:
-                    eprint(tb)
-                    return game_batch
-
             start_time = time.time()
-            games_batch = Parallel(n_jobs=self.num_games)(delayed(generate_batch)() for _i in range(self.num_games))
-            batch = [b for gb in games_batch for b in gb]
+            batch = generate_game_batch(self.board_size, self.fnet, self.mcts_sims, self.num_games)
             random.shuffle(batch)
             end_time = time.time()
             eprint("GAME # %d | Time Taken: %.3f secs" % ((game + 1) * self.num_games, end_time - start_time))
 
             # Update the network
+            gc.collect()
             time.sleep(1) # Have some rest and collect some of your garbage in the meantime
             self.update_network(batch, checkpoint_path=checkpoint_file, logging=logging, log_file=log_file)
 
-    def _chunks(self, chunk_size, num_chunks):
+    def _chunks(self, running_batch, chunk_size, num_chunks):
         """Yield successive n-sized chunks from l."""
         for _i in range(num_chunks):
-            yield [random.choice(self.running_batch) for _c in range(chunk_size)] # With replacement
+            yield [random.choice(running_batch) for _c in range(chunk_size)] # With replacement
             # choices = np.random.choice(len(self.running_batch), chunk_size) # With replacement
             # yield self.running_batch[choices]
 
@@ -108,15 +116,19 @@ class Player:
         new_batch = self._augment_batch(batch)
         random.shuffle(new_batch)
 
-        self.running_batch += new_batch
-        self.running_batch = self.running_batch[-self.batch_size:]
+        # Load and modify the running batch
+        with open(self.running_batch_file, 'rb') as f:
+            running_batch = pickle.load(f)
 
-        for chunk in tqdm(self._chunks(2048, int(2 * len(new_batch) / 2048))):
+        running_batch += new_batch
+        running_batch = running_batch[-self.batch_size:]
+
+        for chunk in tqdm(self._chunks(running_batch, 8192, int(math.ceil(2 * len(new_batch) / 8192)) )):
             self.fnet.train(chunk, logging=logging, log_file=log_file)
 
         if log_file is not None:
             with open(log_file, 'a') as lf:
-                lf.write('\nTrained on running_batch of size %d/%d\n' % (2*len(new_batch), len(self.running_batch)))
+                lf.write('\nTrained on running_batch of size %d/%d\n' % (2*len(new_batch), len(running_batch)))
                 lf.write('---------------------------------------------------------------------------------------\n\n')
 
         # Save the network
@@ -125,7 +137,7 @@ class Player:
 
         # Save the running batch
         with open(self.running_batch_file, 'wb') as f:
-            pickle.dump(self.running_batch, f)
+            pickle.dump(running_batch, f)
 
         eprint ('Network Updated. Time Taken: %d secs' % (time.time() - start_time))
 
@@ -170,8 +182,8 @@ class Player:
 
 if __name__ == '__main__':
     # Create a player
-    player = Player(13, 200, 10, running_batch_file='nov7/batch_file.pkl', fnet='nov7/prevnet.model', load_running_batch=True)
-    player.self_play(500, 'nov7/', logging=True, log_file='nov7/training_log.txt', game_offset=3)
+    player = Player(13, 200, 6, running_batch_file='nov7/batch_file.pkl', fnet='nov7/prevnet.model', load_running_batch=True)
+    player.self_play(500, 'nov7/', logging=True, log_file='nov7/training_log.txt', game_offset=6)
     # player = Player(13, 20, 10, running_batch_file='trash/batch_file.pkl')
     # player.self_play(20, 'trash/', logging=True, log_file='trash/training_log.txt')
 

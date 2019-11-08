@@ -12,7 +12,6 @@ from goenv import GoEnv, create_env_copy
 from fnet import NeuralTrainer
 import traceback
 import time
-import gc
 
 class MonteCarlo:
     def __init__ (self, board_size, fnet : NeuralTrainer, max_sims : int = 20, tau_thres : int = 30):
@@ -41,7 +40,6 @@ class MonteCarlo:
         self.Ps = dict() # Stores initial policy returned by the Fnet
         self.Ms = dict() # Stores list of valid moves
         self.Ts = dict() # Terminal states
-        self.children = dict() # Children of this node
 
     def play_game (self):
         """
@@ -54,7 +52,7 @@ class MonteCarlo:
         root_state = True # Whether this is the first state
 
         move_no = 1
-        while move_no <= 450 and not self.state.isComplete():
+        while move_no <= 350 and not self.state.isComplete():
             print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
             print ('move #%d'%move_no)
             print (len(self.Ns))
@@ -80,7 +78,7 @@ class MonteCarlo:
                     print ("BAD SIMULATION! EXCEPTION OCCURED")
                     tb = traceback.format_exc()
                     print (tb)
-                gc.collect(); time.sleep(0.05 / self.max_sims) # Catch your breath
+                time.sleep(0.05 / self.max_sims) # Catch your breath
 
             # Compute the policy from the root node and add to the batch
             # Add dummy reward to the batch for now, update at end of game
@@ -89,12 +87,8 @@ class MonteCarlo:
 
             # Update state and delete not-needed tree
             print("Move #%d" % move_no); move_no += 1
-            parent_node = self.state.hash_state()
             self.play_move(policy[:], root_state=root_state)
             root_state = False
-            new_node = self.state.hash_state()
-            self._clean_tree(parent_node, new_node) # Clean the unused tree
-            gc.collect() # Clean your garbage
 
         # Update the reward and return the batch
         print(self.state.stepsTaken())
@@ -139,7 +133,7 @@ class MonteCarlo:
         valid_moves = self._get_legal_moves(state)
 
         counts = np.array([self.Nsa[(s,a)] if (s,a) in self.Nsa else 0 for a in range(self.num_actions)])
-        print ('counts:');print (self._get_box_representation(counts)); print (sum(counts))
+        print ('counts (%d):'%sum(counts));print (self._get_box_representation(counts))
         print('valid_moves:');print (self._get_box_representation(valid_moves))
         counts *= valid_moves # Masking with valid moves
 
@@ -173,55 +167,8 @@ class MonteCarlo:
 
         a = np.random.choice(np.arange(0, self.num_actions), p=policy)
         self.state.step(a)
+        print('policy: (%d)' % sum(policy)); print (self._get_box_representation(policy))
         print("Played %s" % a)
-
-    def _clean_tree(self, node, ignore_node):
-        """
-        Destroy the tree recursively for the children of node, other than 'ignore_node'
-        Invariant: Destroy's all children except self(node) and ignore_node
-        """
-        if node == ignore_node:
-            return
-
-        def safe_del (d, k):
-            """
-            safely delete key k from dict d
-            """
-            try:
-                del d[k]
-            except:
-                pass
-
-        def _destroy_state(s):
-            """
-            Delete the state and state-action nodes
-            """
-            if s == ignore_node:
-                return
-
-            safe_del(self.Ns, s)
-            safe_del(self.Ps, s)
-            safe_del(self.Ts, s)
-            safe_del(self.Ms, s)
-
-            for a in range(self.num_actions):
-                safe_del (self.Qsa, (s,a))
-                safe_del (self.Nsa, (s,a))
-
-        if node in self.children:
-            children = self.children[node]
-
-            # Destroy my children list
-            safe_del(self.children, node)
-
-            # Destroy my children
-            for child, _true in children.items():
-                if child == ignore_node:
-                    continue
-                self._clean_tree(child, ignore_node) # Destroy my grandchildren
-                _destroy_state(child) # Destroy my child
-
-
 
     def run_simulator(self, state, terminal_state=False):
         """
@@ -344,12 +291,6 @@ class MonteCarlo:
         else:
             self.Qsa[(s,a)] = v
             self.Nsa[(s,a)] = 1
-
-        # Update children
-        if s in self.children:
-            self.children[s][child_s] = True
-        else:
-            self.children[s] = dict()
 
         self.Ns[s] += 1
         return -v
