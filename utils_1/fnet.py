@@ -167,16 +167,21 @@ class NeuralTrainer():
     
     def predict(self, board):
         # preparing input
+        board = np.array(board)
         board = torch.FloatTensor(board.astype(np.float64))
         if self.cuda_flag: 
             board = board.contiguous().cuda()
-        board = board.unsqueeze(0)
-        self.net.eval()
         
+        if (board.dim()==3):
+            board = board.unsqueeze(0)
+       
+        self.net.eval()
         with torch.no_grad():
             pi, v = self.net(board)
         
-        return pi.data.cpu().numpy()[0], v.data.cpu().numpy()[0]
+        if (board.size(0)==1):
+            return pi.data.cpu().numpy()[0], v.data.cpu().numpy()[0]
+        return pi.data.cpu().numpy(), v.data.cpu().numpy()
     
     def save_model(self, checkpoint_path):
         torch.save(self.net.state_dict(), checkpoint_path)
