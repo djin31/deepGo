@@ -24,7 +24,7 @@ class MonteCarlo:
         np.set_printoptions(precision=3)
 
         # Hyperparameters
-        self.cpuct = 1.5
+        self.cpuct = 0.2#1.5
         self.tau_thres = tau_thres # For how many moves to use the temperature parameter
         self.pass_invalid_thres = int(self.num_actions * 1 / 3) # Do not allow pass if >= these many positions are empty
 
@@ -279,7 +279,6 @@ class MonteCarlo:
 
         # Play according to best action
         s, a, done = play_next(state)
-        child_s = state.hash_state()
 
         # Recursively call simulator on next state
         v = self.run_simulator(state, terminal_state=done)

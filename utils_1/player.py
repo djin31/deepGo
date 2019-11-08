@@ -67,7 +67,7 @@ class Player:
                 pickle.dump([], f)
 
         # Create the network
-        self.fnet = NeuralTrainer(10, board_size, epochs=5, batch_size=128)
+        self.fnet = NeuralTrainer(10, board_size, epochs=1, batch_size=256, lr=0.1)
         if fnet is not None:
             # Load the network from the file
             self.fnet.load_model(fnet)
@@ -123,13 +123,8 @@ class Player:
         running_batch += new_batch
         running_batch = running_batch[-self.batch_size:]
 
-        for chunk in tqdm(self._chunks(running_batch, 8192, int(math.ceil(2 * len(new_batch) / 8192)) )):
+        for chunk in tqdm(self._chunks(running_batch, 16384, int(math.ceil(10 * len(new_batch) / 16384)) )):
             self.fnet.train(chunk, logging=logging, log_file=log_file)
-
-        if log_file is not None:
-            with open(log_file, 'a') as lf:
-                lf.write('\nTrained on running_batch of size %d/%d\n' % (2*len(new_batch), len(running_batch)))
-                lf.write('---------------------------------------------------------------------------------------\n\n')
 
         # Save the network
         if checkpoint_path is not None:
@@ -138,6 +133,11 @@ class Player:
         # Save the running batch
         with open(self.running_batch_file, 'wb') as f:
             pickle.dump(running_batch, f)
+
+        if log_file is not None:
+            with open(log_file, 'a') as lf:
+                lf.write('\nTrained on running_batch of size %d/%d\n' % (16384 * int(math.ceil(10 * len(new_batch) / 16384)), len(running_batch)))
+                lf.write('---------------------------------------------------------------------------------------\n\n')
 
         eprint ('Network Updated. Time Taken: %d secs' % (time.time() - start_time))
 
@@ -183,7 +183,7 @@ class Player:
 if __name__ == '__main__':
     # Create a player
     player = Player(13, 200, 6, running_batch_file='nov7/batch_file.pkl', fnet='nov7/prevnet.model', load_running_batch=True)
-    player.self_play(500, 'nov7/', logging=True, log_file='nov7/training_log.txt', game_offset=6)
+    player.self_play(500, 'nov7/', logging=True, log_file='nov7/training_log.txt', game_offset=15)
     # player = Player(13, 20, 10, running_batch_file='trash/batch_file.pkl')
     # player.self_play(20, 'trash/', logging=True, log_file='trash/training_log.txt')
 
