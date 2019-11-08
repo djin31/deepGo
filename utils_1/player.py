@@ -19,11 +19,17 @@ import sys
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
+# def generate_game_batch ():
+#     """
+#     A function independent of the big structures of the Player class
+#     """
+
+
 class Player:
     """
     Self-play bot, generating thousands of MCTS games, and training the neural network
     """
-    def __init__ (self, board_size=13, mcts_sims=100, num_games=10, batch_size=50000, running_batch_file='running_batch.pkl', fnet=None,  load_running_batch=False):
+    def __init__ (self, board_size=13, mcts_sims=100, num_games=10, batch_size=100000, running_batch_file='running_batch.pkl', fnet=None,  load_running_batch=False):
         """
         Initialize the Player class, instantiating the monte-carlo and Fnetwork
         """
@@ -39,18 +45,19 @@ class Player:
             self.running_batch = [] # Running batch for training
 
         # Create the network
-        self.fnet = NeuralTrainer(10, board_size)
+        self.fnet = NeuralTrainer(10, board_size, epochs=5)
         if fnet is not None:
             # Load the network from the file
             self.fnet.load_model(fnet)
 
 
-    def self_play(self, total_games=10, checkpoint_path=None,  logging=True, log_file=None):
+    def self_play(self, total_games=10, checkpoint_path=None,  logging=True, log_file=None, game_offset=0):
         """
         Generate games from self-play and update the network
         """
         num_times = int(np.ceil(total_games / self.num_games))
-        for game in range(num_times):
+        for g in range(num_times):
+            game = g + game_offset
             # Catch your breath
             time.sleep(1)
 
@@ -163,6 +170,8 @@ class Player:
 
 if __name__ == '__main__':
     # Create a player
-    player = Player(13, 200, 10, running_batch_file='nov7/batch_file.pkl')
-    player.self_play(200, 'nov7/', logging=True, log_file='nov7/training_log.txt')
+    player = Player(13, 200, 10, running_batch_file='nov7/batch_file.pkl', fnet='nov7/prevnet.model', load_running_batch=True)
+    player.self_play(500, 'nov7/', logging=True, log_file='nov7/training_log.txt', game_offset=3)
+    # player = Player(13, 20, 10, running_batch_file='trash/batch_file.pkl')
+    # player.self_play(20, 'trash/', logging=True, log_file='trash/training_log.txt')
 
