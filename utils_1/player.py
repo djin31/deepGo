@@ -4,7 +4,7 @@ Class containing the player which interacts with Monte-Carlo to learn and play t
 
 import numpy as np
 import traceback
-from montecarlo import MonteCarlo
+from mc import MonteCarlo
 from fnet import NeuralTrainer
 import time, os
 from joblib import Parallel, delayed
@@ -67,7 +67,7 @@ class Player:
                 pickle.dump([], f)
 
         # Create the network
-        self.fnet = NeuralTrainer(10, board_size, epochs=1, batch_size=256, lr=0.1)
+        self.fnet = NeuralTrainer(10, board_size, epochs=1, batch_size=256, lr=0.05)
         if fnet is not None:
             # Load the network from the file
             self.fnet.load_model(fnet)
@@ -180,8 +180,8 @@ class Player:
 
 if __name__ == '__main__':
     # Create a player
-    player = Player(13, 200, 6, running_batch_file='nov8/batch_file.pkl', load_running_batch=False)
-    player.self_play(500, 'nov8/', logging=True, log_file='nov8/training_log.txt', game_offset=0)
+    player = Player(13, 30, 6, running_batch_file='nov9-correct/batch_file.pkl', load_running_batch=False)
+    player.self_play(500, 'nov9-correct/', logging=True, log_file='nov9-correct/training_log.txt', game_offset=0)
     # player = Player(13, 20, 10, running_batch_file='trash/batch_file.pkl')
     # player.self_play(20, 'trash/', logging=True, log_file='trash/training_log.txt')
 

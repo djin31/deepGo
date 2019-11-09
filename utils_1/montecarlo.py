@@ -58,13 +58,14 @@ class MonteCarlo:
             print ('Move #%d || Ns: %d | Qsa: %d | Ms: %d' % (move_no, len(self.Ns), len(self.Qsa), len(self.Ms)))
             print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
 
-            # Refresh the dictionaries every 250 moves
-            if (np.random.rand() < 1 / 250):
+            # Refresh the dictionaries every 200 moves
+            if (np.random.rand() < 1 / 200):
                 print ("Clearing the dicts @ Move #%d" % move_no)
                 self.clear_dicts()
 
             # Add self and children to the dictionaries
-            # self.add_children() # Not implemented yet!
+            print ('Generating children!!')
+            self.add_children() # Not implemented yet!
             
             # Perform a simulation on the COPY of current state
             for _sim in range(self.max_sims):
@@ -100,7 +101,7 @@ class MonteCarlo:
         print ("And the winner is .... %s !" % ('White' if winner == -1 else 'Black'))
 
         for idx, (s, pi, r) in enumerate(self.batch):
-            player = 1 if s[16][0][0] == 1 else -1
+            player = -1 if s[16][0][0] == 1 else 1
             r = winner * player
             self.batch[idx] = (s, pi, r)
 
@@ -123,69 +124,78 @@ class MonteCarlo:
         gc.collect()
         time.sleep(0.1)
 
-    # def add_children(self):
-    #     """
-    #     Add children of current state into the dictionaries
-    #     """
+    def add_children(self):
+        """
+        Add children of current state into the dictionaries
+        """
 
-    #     stack = self.state.get_history()
-    #     s = self.state.hash_state()
+        stack = self.state.get_history()
+        s = self.state.hash_state()
 
-    #     if s not in self.Ps:
-    #         p, _v = self.fnet.predict(stack)
-    #         valid_moves, p = self._get_masked_policy(self.state, p)
-    #         self.Ms[s] = valid_moves
-    #         self.Ps[s] = p
-    #         self.Ns[s] = 0
-    #     else:
-    #         valid_moves = self.Ms[s]
+        if s not in self.Ps:
+            p, _v = self.fnet.predict(stack)
+            valid_moves, p = self._get_masked_policy(self.state, p)
+            self.Ms[s] = valid_moves
+            self.Ps[s] = p
+            self.Ns[s] = 0
+        else:
+            valid_moves = self.Ms[s]
 
-    #     # Find my children
-    #     children = []; actions = []
-    #     for a in range(self.num_actions):
-    #         if valid_moves[a]:
-    #             try:
-    #                 state = create_env_copy(self.state)
-    #                 state.step(a)
-    #                 children.append(state)
-    #                 actions.append(a)
-    #             except:
-    #                 continue
+        # Find my children
+        children = []; actions = []
+        for a in range(self.num_actions):
+            if valid_moves[a]:
+                try:
+                    state = create_env_copy(self.state)
+                    state.step(a)
+                    children.append(state)
+                    actions.append(a)
+                except:
+                    continue
         
-    #     stack_list = [state.get_history() for state in children]
-    #     pi_list, v_list = self.fnet.predict(stack_list)
+        stack_list = [state.get_history() for state in children]
+        pi_list, v_list = self.fnet.predict(stack_list)
 
-    #     parent_s = self.state.hash_state()
-    #     self.Ns[parent_s] = len(children)
+        parent_s = self.state.hash_state()
+        for p, v, state, a in zip(pi_list, v_list, children, actions):
+            s = state.hash_state()
+            valid_moves, p = self._get_masked_policy(state, p)
+            self.Ms[s] = valid_moves
+            self.Ps[s] = p
+            self.Ns[s] = 0
 
-    #     for p, v, state, a in zip(pi_list, v_list, children, actions):
-    #         s = state.hash_state()
-    #         valid_moves, p = self._get_masked_policy(state, p)
-    #         self.Ms[s] = valid_moves
-    #         self.Ps[s] = p
-    #         self.Ns[s] = 0
-
-    #         self.Qsa[(parent_s, a)] = 
-
-    # def _get_masked_policy(self, state, p):
-    #     """
-    #     Getting masked policy and valid moves once for each leaf node
-    #     """
-    #     valid_moves = self._get_legal_moves(state)
-    #     p = p * valid_moves # Masking invalid moves
-    #     sum_p = np.sum(p)
-    #     if sum_p > 0:
-    #         p /= sum_p
-    #     else:
-    #         print ('All valid moves had to be masked!!')
-    #         p = p + valid_moves
-    #         if (np.sum(p) != 0):
-    #             p /= np.sum(p)
-    #         else:
-    #             print ('NO VALID MOVE POSSIBLE !!!!!!!!!')
-    #             p = np.zeros(self.num_actions); p[self.num_actions - 1] = 1 # Pass
+            sa_tuple = (parent_s, a)
+            if sa_tuple in self.Qsa:
+                self.Qsa[sa_tuple] = (self.Nsa[sa_tuple] * self.Qsa[sa_tuple] + (-v)) / (self.Nsa[sa_tuple] + 1)
+                self.Qsa[(parent_s, a)] += 1
+            else:
+                self.Qsa[sa_tuple] = -v
+                self.Nsa[sa_tuple] = 1
             
-    #     return valid_moves, p
+            self.Ns[parent_s] += 1
+
+        gc.collect() # Cleaning up the mess
+        time.sleep(0.05)
+
+    def _get_masked_policy(self, state, p):
+        """
+        Getting masked policy and valid moves once for each leaf node
+        """
+        valid_moves = self._get_legal_moves(state)
+        p = p * valid_moves # Masking invalid moves
+        sum_p = np.sum(p)
+        if sum_p > 0:
+            p /= sum_p
+        else:
+            print ('All valid moves had to be masked!!')
+            p = p + valid_moves
+            if (np.sum(p) != 0):
+                p /= np.sum(p)
+            else:
+                print ('NO VALID MOVE POSSIBLE !!!!!!!!!')
+                p = np.zeros(self.num_actions); p[self.num_actions - 1] = 1 # Pass
+            
+        return valid_moves, p
 
 
 
@@ -194,7 +204,7 @@ class MonteCarlo:
         Get legal moves from this state
         If significant portion of the board is empty, and other moves are allowed, you SHOULD NOT pass
         """
-        valid_moves = state.get_legal_moves(avoid_dumb_passes=False)
+        valid_moves = state.get_legal_moves(avoid_dumb_passes=True)
         if (state.get_empty() > self.pass_invalid_thres and np.sum(valid_moves) > 0):
             valid_moves[-1] = 0 # No passing around!
         return valid_moves
