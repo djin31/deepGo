@@ -124,6 +124,17 @@ class MonteCarlo:
         policy = np.zeros(self.num_actions) # Do nothing
         self.batch.append((self.state.get_history(), policy, 1))
 
+        # Printing the batch to see
+        print ('Printing the second last batch....')
+        print (self.batch[-2])
+        print ('Printing the last batch...')
+        print (self.batch[-1])
+        print ('Printing the current state')
+        self.state.print_board()
+        print ('=========================================================================================================')
+
+
+
         # Now that I am done, clean my mess and return
         self.clear_dicts()
         gc.collect()
@@ -399,13 +410,23 @@ class MonteCarlo:
 
             for a in range(self.num_actions):
                 if valid_moves[a]:
-                    # print (a, end=' ')
+                    if (s,a) in self.Nsa and self.Nsa[(s,a)] > 0.9 * self.max_sims:
+                        continue # Let's try something else now
                     value = get_Q_plus_U(s, a)
                     if value > best:
                         best = value
                         best_action = a
 
-            return best_action
+            if best_action > -1:
+               return best_action
+            else:
+                for a in range(self.num_actions):
+                    if valid_moves[a]:
+                        value = get_Q_plus_U(s, a)
+                        if value > best:
+                            best = value
+                            best_action = a
+                return best_action if best_action > -1 else self.num_actions - 1
 
         def play_next(depth):
             if (depth > 5):

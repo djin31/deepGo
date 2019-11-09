@@ -186,7 +186,7 @@ if __name__ == '__main__':
     # Create a player
     # player = Player(13, 30, 6, running_batch_file='nov9-correct/batch_file.pkl')
     player = Player(13, 30, 6, running_batch_file='nov9-correct/batch_file.pkl', fnet='nov9-correct/latest.model', load_running_batch=True)
-    player.self_play(500, 'nov9-correct/', logging=True, log_file='nov9-correct/training_log.txt', game_offset=4)
+    player.self_play(500, 'nov9-correct/', logging=True, log_file='nov9-correct/training_log.txt', game_offset=6)
     # player = Player(13, 20, 10, running_batch_file='trash/batch_file.pkl')
     # player.self_play(20, 'trash/', logging=True, log_file='trash/training_log.txt')
 
