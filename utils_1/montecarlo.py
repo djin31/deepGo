@@ -25,9 +25,11 @@ class MonteCarlo:
         np.set_printoptions(precision=3)
 
         # Hyperparameters
-        self.cpuct = 0.2 #1.5
+        self.cpuct = 1.5 #0.2 #1.5
         self.tau_thres = tau_thres # For how many moves to use the temperature parameter
         self.pass_invalid_thres = int(self.num_actions * 1 / 3) # Do not allow pass if >= these many positions are empty
+        # self.last_seen_thres = 10 # If you are not seen in the last seen, go away
+        self.cleaning_thres = 120 # After this many moves, clear the dictionaries
 
         # Set of (s, pi, r) tuples
         # s here is the complete 17*13*13 state
@@ -41,6 +43,7 @@ class MonteCarlo:
         self.Ps = dict() # Stores initial policy returned by the Fnet
         self.Ms = dict() # Stores list of valid moves
         self.Ts = dict() # Terminal states
+        # self.last_seen = dict() # What was the last move in which you were seen
 
     def play_game (self):
         """
@@ -53,30 +56,31 @@ class MonteCarlo:
         root_state = True # Whether this is the first state
 
         move_no = 1
-        while not self.state.isComplete():
+        while move_no <= 400 and not self.state.isComplete():
             print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
             print ('Move #%d || Ns: %d | Qsa: %d | Ms: %d' % (move_no, len(self.Ns), len(self.Qsa), len(self.Ms)))
             print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
 
             # Refresh the dictionaries every 200 moves
-            if (np.random.rand() < 1 / 200):
-                print ("Clearing the dicts @ Move #%d" % move_no)
-                self.clear_dicts()
+            # if (np.random.rand() < 1 / 200):
+            #     print ("Clearing the dicts @ Move #%d" % move_no)
+            #     self.clear_dicts()
 
             # Add self and children to the dictionaries
             print ('Generating children!!')
-            self.add_children() # Not implemented yet!
+            self.add_children(move_no) # Not implemented yet!
             
             # Perform a simulation on the COPY of current state
             for _sim in range(self.max_sims):
                 try:
                     start_state = create_env_copy(self.state)
-                    self.run_simulator(start_state)
+                    self.run_simulator(start_state, depth=0)
                 except:
                     print('@@@@@@@@@@@@@@@@@@@@@@@@@@@@2@@@@@@@@')
                     print ("BAD SIMULATION! EXCEPTION OCCURED")
                     tb = traceback.format_exc()
                     print (tb)
+                gc.collect()
                 time.sleep(0.05 / self.max_sims) # Catch your breath
 
             # Print state
@@ -93,12 +97,23 @@ class MonteCarlo:
             self.play_move(policy[:], root_state=root_state)
             root_state = False
 
+            # if (move_no % (6*self.last_seen_thres) == 0):
+            if (move_no % self.cleaning_thres == 0):
+                # Time to do some cleaning up
+                start_time = time.time()
+                print ('Time to do some cleaning!!')
+                # self.clean_dicts(move_no)
+                self.clear_dicts()
+                print ('Cleaning took %s secs' % (time.time() - start_time))
+
+            gc.collect() # Clean up your mess
+
         # Update the reward and return the batch
         print(self.state.stepsTaken())
         winner = -1 * self.state.get_winner()
-        print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&')
         self.state.print_board()
         print ("And the winner is .... %s !" % ('White' if winner == -1 else 'Black'))
+        print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&')
 
         for idx, (s, pi, r) in enumerate(self.batch):
             player = -1 if s[16][0][0] == 1 else 1
@@ -109,7 +124,11 @@ class MonteCarlo:
         policy = np.zeros(self.num_actions) # Do nothing
         self.batch.append((self.state.get_history(), policy, 1))
 
-        return self.batch
+        # Now that I am done, clean my mess and return
+        self.clear_dicts()
+        gc.collect()
+
+        return self.batch, move_no
 
     def clear_dicts(self):
         """
@@ -124,7 +143,41 @@ class MonteCarlo:
         gc.collect()
         time.sleep(0.1)
 
-    def add_children(self):
+    # def clean_dicts(self, move_no):
+    #     """
+    #     Clean all dictionaries
+    #     """
+    #     new_Ns = 
+
+        # for s in list(self.last_seen.keys()):
+        #     if abs(move_no - self.last_seen[s]) > self.last_seen_thres:
+    #             # We saw this s a long long time ago -> throw it away
+    #             self.clear_dicts(s)
+
+    # def clear_dicts(self, s):
+    #     """
+    #     Clear all dicts from s
+    #     """
+    #     def safe_delete(d, k):
+    #         try:
+    #             del d[k]
+    #         except:
+    #             pass
+
+    #     safe_delete(self.Ns, s)
+    #     safe_delete(self.Ps, s)
+    #     safe_delete(self.Ms, s)
+    #     safe_delete(self.Ts, s)
+    #     safe_delete(self.last_seen, s)
+    #     for a in range(self.num_actions):
+    #         safe_delete(self.Qsa, (s,a))
+    #         safe_delete(self.Nsa, (s,a))
+
+    #     gc.collect()
+    #     time.sleep(0.1) # Take some rest
+
+
+    def add_children(self, move_no):
         """
         Add children of current state into the dictionaries
         """
@@ -132,6 +185,7 @@ class MonteCarlo:
         stack = self.state.get_history()
         s = self.state.hash_state()
 
+        # self.last_seen[s] = move_no
         if s not in self.Ps:
             p, _v = self.fnet.predict(stack)
             valid_moves, p = self._get_masked_policy(self.state, p)
@@ -140,6 +194,7 @@ class MonteCarlo:
             self.Ns[s] = 0
         else:
             valid_moves = self.Ms[s]
+
 
         # Find my children
         children = []; actions = []
@@ -163,6 +218,7 @@ class MonteCarlo:
             self.Ms[s] = valid_moves
             self.Ps[s] = p
             self.Ns[s] = 0
+            # self.last_seen[s] = move_no
 
             sa_tuple = (parent_s, a)
             if sa_tuple in self.Qsa:
@@ -261,7 +317,7 @@ class MonteCarlo:
         print('policy: (%d)' % sum(policy)); print (self._get_box_representation(policy))
         print("Played %s" % a)
 
-    def run_simulator(self, state, terminal_state=False):
+    def run_simulator(self, state, depth, terminal_state=False):
         """
         Run one iteration of the MCTS simulation from the 'root': state
         Fig. 2 of paper
@@ -270,9 +326,17 @@ class MonteCarlo:
         c. Update the path to the root with the value
         """
         np.set_printoptions(precision=5, suppress=True)
+
+        if (depth > self.max_sims + 10):
+            # Somehow it's going into an infinite loop
+            gc.collect()
+            raise ValueError('Failed Simulation')
+
         # Get the board representation of state
         s = state.hash_state()
         stack = state.get_history()
+
+        # self.last_seen[s] = move_no
 
         if s not in self.Ts:
             self.Ts[s] = state.isComplete()
@@ -314,6 +378,14 @@ class MonteCarlo:
         # Pick the action with highest confidance bound
         def pick_action(s):
             valid_moves = self.Ms[s]
+            if (np.sum(valid_moves) == 0):
+                print ("The only valid moves seems to be pass!!")
+                return self.num_actions - 1
+
+            # Do exploration 5% of your time!!
+            if (np.random.rand() < 0.1):
+                return np.random.choice(np.arange(0, self.num_actions), p=(valid_moves / np.sum(valid_moves)))
+
             best = -float('inf')
             best_action = -1
 
@@ -335,20 +407,26 @@ class MonteCarlo:
 
             return best_action
 
-        def play_next(state):
-            s = state.hash_state()
+        def play_next(depth):
+            if (depth > 5):
+                # Enough is enough
+                gc.collect()
+                raise ValueError('Unable to play next move')
+
+            # s = state.hash_state()
 
             if (s[1] != state.player_turn()):
                 print ('########################## OOOOOOOOOOOOO #########################')
                 print (s[1])
                 print (state.player_turn())
                 print ('##################################################################')
+                raise ValueError ("@Mankaran how could this happen!")
             try:
                 a = pick_action(s)
                 if a < 0 or a >= self.num_actions:
                     a = self.num_actions - 1 # pass
                 _, _, done = state.step(a)
-                return s, a, done
+                return a, done
             except:
                 # Some error occurred in taking the move => Print the state and valid moves
                 print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
@@ -366,13 +444,15 @@ class MonteCarlo:
                 print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
 
                 self.Ms[s][a] = 0 # Make this move invalid
-                return play_next(state)
+                raise ValueError('Seems to be fighting a KO fight')
+
+                # return play_next(depth=depth+1)
 
         # Play according to best action
-        s, a, done = play_next(state)
+        a, done = play_next(depth=0)
 
         # Recursively call simulator on next state
-        v = self.run_simulator(state, terminal_state=done)
+        v = self.run_simulator(state, depth=depth+1, terminal_state=done)
 
         # Update Qsa
         if (s,a) in self.Qsa:

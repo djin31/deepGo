@@ -4,7 +4,7 @@ Class containing the player which interacts with Monte-Carlo to learn and play t
 
 import numpy as np
 import traceback
-from mc import MonteCarlo
+from montecarlo import MonteCarlo
 from fnet import NeuralTrainer
 import time, os
 from joblib import Parallel, delayed
@@ -30,20 +30,24 @@ def generate_game_batch (board_size, fnet, mcts_sims, num_games):
         """
         Generate a single game and batch
         """
-        game_batch = []
+        game_batch = []; num_moves = 0
         try:
             eprint ("instantiating sim")
             simulator = MonteCarlo(board_size, fnet, mcts_sims) # Create a MCTS simulator
-            game_batch = simulator.play_game()
+            game_batch, num_moves = simulator.play_game()
+            gc.collect() # Clean up your mess
         except:
             tb = traceback.format_exc()
         else:
             tb = "No error"
         finally:
             eprint(tb)
-            return game_batch
+            return game_batch, num_moves
 
-    games_batch = Parallel(n_jobs=num_games)(delayed(play_game)(board_size, fnet, mcts_sims) for i in range(num_games))
+    result = Parallel(n_jobs=num_games)(delayed(play_game)(board_size, fnet, mcts_sims) for i in range(num_games))
+    games_batch = [tup[0] for tup in result]
+    num_moves = [tup[1] for tup in result]
+    eprint (num_moves)
     batch = [b for gb in games_batch for b in gb]
     return batch
 
@@ -180,8 +184,9 @@ class Player:
 
 if __name__ == '__main__':
     # Create a player
-    player = Player(13, 30, 6, running_batch_file='nov9-correct/batch_file.pkl', load_running_batch=False)
-    player.self_play(500, 'nov9-correct/', logging=True, log_file='nov9-correct/training_log.txt', game_offset=0)
+    # player = Player(13, 30, 6, running_batch_file='nov9-correct/batch_file.pkl')
+    player = Player(13, 30, 6, running_batch_file='nov9-correct/batch_file.pkl', fnet='nov9-correct/latest.model', load_running_batch=True)
+    player.self_play(500, 'nov9-correct/', logging=True, log_file='nov9-correct/training_log.txt', game_offset=4)
     # player = Player(13, 20, 10, running_batch_file='trash/batch_file.pkl')
     # player.self_play(20, 'trash/', logging=True, log_file='trash/training_log.txt')
 
