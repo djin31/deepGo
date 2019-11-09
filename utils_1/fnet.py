@@ -151,6 +151,8 @@ class NeuralTrainer():
                 opt.zero_grad()
                 total_loss.backward()
                 opt.step()
+            policy_loss/=len(train_loader)
+            value_loss/=len(train_loader)
             if logging:
                 print("Epoch:{} Policy Loss:{} Value Loss:{}".format(epoch, policy_loss, value_loss))
         
