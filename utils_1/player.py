@@ -30,12 +30,11 @@ def generate_game_batch (board_size, fnet, mcts_sims, num_games):
         """
         Generate a single game and batch
         """
-        game_batch = []; num_moves = 0
+        game_batch = []; num_moves = -1
         try:
             eprint ("instantiating sim")
             simulator = MonteCarlo(board_size, fnet, mcts_sims) # Create a MCTS simulator
             game_batch, num_moves = simulator.play_game()
-            gc.collect() # Clean up your mess
         except:
             tb = traceback.format_exc()
         else:
@@ -44,11 +43,13 @@ def generate_game_batch (board_size, fnet, mcts_sims, num_games):
             eprint(tb)
             return game_batch, num_moves
 
-    result = Parallel(n_jobs=num_games)(delayed(play_game)(board_size, fnet, mcts_sims) for i in range(num_games))
-    games_batch = [tup[0] for tup in result]
-    num_moves = [tup[1] for tup in result]
-    eprint (num_moves)
+    results = Parallel(n_jobs=num_games)(delayed(play_game)(board_size, fnet, mcts_sims) for i in range(num_games))
+    games_batch = [r[0] for r in results]
+    moves = [r[1] for r in results]
+    eprint (moves)
     batch = [b for gb in games_batch for b in gb]
+    gc.collect()
+
     return batch
 
 
@@ -109,6 +110,8 @@ class Player:
         """Yield successive n-sized chunks from l."""
         for _i in range(num_chunks):
             yield [random.choice(running_batch) for _c in range(chunk_size)] # With replacement
+            # choices = np.random.choice(len(self.running_batch), chunk_size) # With replacement
+            # yield self.running_batch[choices]
 
     def update_network(self, batch, checkpoint_path=None, logging=True, log_file=None):
         """
@@ -125,7 +128,7 @@ class Player:
         running_batch += new_batch
         running_batch = running_batch[-self.batch_size:]
 
-        for chunk in tqdm(self._chunks(running_batch, 16384, int(math.ceil(10 * len(new_batch) / 16384)) )):
+        for chunk in tqdm(self._chunks(running_batch, 16384, 5) ):
             self.fnet.train(chunk, logging=logging, log_file=log_file)
 
         # Save the network
@@ -138,7 +141,7 @@ class Player:
 
         if log_file is not None:
             with open(log_file, 'a') as lf:
-                lf.write('\nTrained on running_batch of size %d/%d\n' % (16384 * int(math.ceil(10 * len(new_batch) / 16384)), len(running_batch)))
+                lf.write('\nTrained on running_batch of size %d/%d\n' % (16384 * 5, len(running_batch)))
                 lf.write('---------------------------------------------------------------------------------------\n\n')
 
         eprint ('Network Updated. Time Taken: %d secs' % (time.time() - start_time))
@@ -184,9 +187,5 @@ class Player:
 
 if __name__ == '__main__':
     # Create a player
-    # player = Player(13, 30, 6, running_batch_file='nov9-correct/batch_file.pkl')
-    player = Player(13, 30, 6, running_batch_file='nov9-correct/batch_file.pkl', fnet='nov9-correct/latest.model', load_running_batch=True)
-    player.self_play(500, 'nov9-correct/', logging=True, log_file='nov9-correct/training_log.txt', game_offset=6)
-    # player = Player(13, 20, 10, running_batch_file='trash/batch_file.pkl')
-    # player.self_play(20, 'trash/', logging=True, log_file='trash/training_log.txt')
-
+    player = Player(13, 200, 10, running_batch_file='nov10/batch_file.pkl', load_running_batch=True, fnet='nov10/net1.model')
+    player.self_play(1000, 'nov10/', logging=True, log_file='nov10/training.txt', game_offset=2)
