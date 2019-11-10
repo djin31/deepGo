@@ -8,6 +8,8 @@ Class GoEnv(): All the API's of this class are in SuperGo.py
 
 	give_Board() -> returns a 13*13 np array with elements as 1 if black stone, -1 if white stone, 0 if empty
 
+	print_board() -> Prints the board with X (black), O (white), . (empty)
+	
 	reset() -> should be called after every __init__ basically resets the board
 
 	get_winner() -> after the game ends, give reward = 1 if white wins else -1
