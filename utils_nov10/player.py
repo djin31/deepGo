@@ -46,7 +46,7 @@ def generate_game_batch (board_size, fnet, mcts_sims, num_games):
     results = Parallel(n_jobs=num_games)(delayed(play_game)(board_size, fnet, mcts_sims) for i in range(num_games))
     games_batch = [r[0] for r in results]
     moves = [r[1] for r in results]
-    print (moves)
+    eprint (moves)
     batch = [b for gb in games_batch for b in gb]
     gc.collect()
 
@@ -72,7 +72,7 @@ class Player:
                 pickle.dump([], f)
 
         # Create the network
-        self.fnet = NeuralTrainer(10, board_size, epochs=1, batch_size=256, lr=0.1)
+        self.fnet = NeuralTrainer(10, board_size, epochs=1, batch_size=256, lr=0.05)
         if fnet is not None:
             # Load the network from the file
             self.fnet.load_model(fnet)
@@ -187,5 +187,5 @@ class Player:
 
 if __name__ == '__main__':
     # Create a player
-    player = Player(13, 200, 6, running_batch_file='nov10/batch_file.pkl')
-    player.self_play(1000, 'nov10/', logging=True, log_file='nov10/training.txt', game_offset=0)
+    player = Player(13, 200, 10, running_batch_file='nov10/batch_file.pkl', load_running_batch=True, fnet='nov10/net1.model')
+    player.self_play(1000, 'nov10/', logging=True, log_file='nov10/training.txt', game_offset=2)
