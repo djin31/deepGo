@@ -6,7 +6,6 @@ Runs simulations and return a batch to update the neural network
 """
 
 import numpy as np
-from scipy.special import softmax
 from goenv import GoEnv, create_env_copy
 from fnet import NeuralTrainer
 import traceback
@@ -53,7 +52,7 @@ class MonteCarlo:
         root_state = True # Whether this is the first state
 
         move_no = 1
-        while move_no <= 500 and not self.state.isComplete():
+        while move_no <= 600 and not self.state.isComplete():
             print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
             print ('Move #%d || Ns: %d | Qsa: %d | Ms: %d | Vs: %d' % (move_no, len(self.Ns), len(self.Qsa), len(self.Ms), len(self.Vs) ))
             print ('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
@@ -148,7 +147,7 @@ class MonteCarlo:
 
         counts = np.array([self.Nsa[(s,a)] if (s,a) in self.Nsa else 0 for a in range(self.num_actions)])
         print ('counts (%d):'%sum(counts));print (self._get_box_representation(counts))
-        # print('valid_moves:');print (self._get_box_representation(valid_moves))
+        print('valid_moves:');print (self._get_box_representation(valid_moves))
         counts *= valid_moves # Masking with valid moves
 
         if np.sum(counts) == 0:
@@ -232,15 +231,20 @@ class MonteCarlo:
             self.Ps[s] = p
             self.Ns[s] = 0
 
-            return -v
+            # For the value make a weighted average of neural network value and fast score
+            value = 0.6 * v + 0.4 * (-1 * state.player_turn() * state.get_winner())
+            return -value
 
         if depth > 60:
             print ('hehe depth=', depth)
             if s in self.Vs:
                 return -self.Vs[s]
             p, v = self.fnet.predict(stack)
-            self.Vs[s] = v
-            return -v
+
+            # For the value make a weighted average of neural network value and fast score
+            value = 0.6 * v + 0.4 * (-1 * state.player_turn() * state.get_winner())
+            self.Vs[s] = value
+            return -value
 
         # Pick the action with highest confidance bound
         def pick_action(s):
@@ -258,12 +262,16 @@ class MonteCarlo:
 
             for a in range(self.num_actions):
                 if valid_moves[a]:
-                    # print (a, end=' ')
+                    if (s,a) in self.Nsa and self.Nsa[(s,a)] >= 10 and (self.Nsa[(s,a)] / self.Ns[s] >= 0.60):
+                        # You have explored this action very much => time to explore some other actions too
+                        continue
                     value = get_Q_plus_U(s, a)
                     if value > best:
                         best = value
                         best_action = a
 
+            if best_action == -1:
+                return self.num_actions - 1 # Pass
             return best_action
 
         def play_next(state):

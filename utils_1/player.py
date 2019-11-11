@@ -72,7 +72,7 @@ class Player:
                 pickle.dump([], f)
 
         # Create the network
-        self.fnet = NeuralTrainer(10, board_size, epochs=1, batch_size=256, lr=0.03)
+        self.fnet = NeuralTrainer(10, board_size, epochs=1, batch_size=256, lr=0.1)
         if fnet is not None:
             # Load the network from the file
             self.fnet.load_model(fnet)
@@ -128,7 +128,7 @@ class Player:
         running_batch += new_batch
         running_batch = running_batch[-self.batch_size:]
 
-        for chunk in tqdm(self._chunks(running_batch, 16384, 5) ):
+        for chunk in tqdm(self._chunks(running_batch, 16384, 8) ):
             self.fnet.train(chunk, logging=logging, log_file=log_file)
 
         # Save the network
@@ -141,10 +141,11 @@ class Player:
 
         if log_file is not None:
             with open(log_file, 'a') as lf:
-                lf.write('\nTrained on running_batch of size %d/%d\n' % (16384 * 5, len(running_batch)))
+                lf.write('\nTrained on running_batch of size %d/%d\n' % (16384 * 8, len(running_batch)))
                 lf.write('---------------------------------------------------------------------------------------\n\n')
 
         eprint ('Network Updated. Time Taken: %d secs' % (time.time() - start_time))
+        gc.collect()
 
     def _augment_batch(self, batch):
         """
@@ -187,5 +188,7 @@ class Player:
 
 if __name__ == '__main__':
     # Create a player
-    player = Player(13, 200, 10, running_batch_file='nov10/batch_file.pkl', load_running_batch=True, fnet='nov10/net9.model')
-    player.self_play(1000, 'nov10/', logging=True, log_file='nov10/training.txt', game_offset=10)
+    player = Player(13, 200, 14, batch_size=150000, running_batch_file='nov11/batch_file.pkl', load_running_batch=False, fnet='nov10/net32.model')
+    player.self_play(1000, 'nov11/', logging=True, log_file='nov11/training.txt', game_offset=0)
+    # player = Player(13, 200, 14, batch_size=150000, running_batch_file='nov10/batch_file.pkl', load_running_batch=True, fnet='nov10/net13.model')
+    # player.self_play(1000, 'nov10/', logging=True, log_file='nov10/training.txt', game_offset=14)

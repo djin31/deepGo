@@ -80,7 +80,7 @@ class GoEnv():
         return 0
     
 
-    def get_legal_moves(self, avoid_dumb_passes=True):
+    def get_legal_moves(self):
         """ Get all the legal moves and transform their coords into 1d """
 
         legal_moves = self.board.get_legal_coords(self.player_color, filter_suicides=True)
@@ -88,7 +88,7 @@ class GoEnv():
 
         for pachi_move in legal_moves:
             move = _coord_to_action(self.board, pachi_move)
-            if not avoid_dumb_passes or move != self.board_size ** 2 or self.test_move(move):
+            if move != self.board_size ** 2 or self.test_move(move):
                 final_moves[move] = 1
         if(np.sum(final_moves)==0):
             final_moves[self.board_size**2] = 1 

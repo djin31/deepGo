@@ -72,9 +72,9 @@ class MCTSPlayer:
             time.sleep(0.05 / self.max_sims) # Catch your breath
 
         action = self.play_move(TA_simulator)
-        # policy = self._compute_pi(self.state)
-        # self.play_move(policy[:])
         self.moves_played += 1
+
+        return action
 
     def clear_dicts(self):
         """
