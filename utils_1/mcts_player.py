@@ -120,6 +120,11 @@ class MCTSPlayer:
 
             try:
                 # Verify with TA_simulator
+                if not TA_simulator.is_legal_action(TA_simulator.state, action):
+                    # Make this action INVALID
+                    print ("Somehow TA simulator not allowing action {}".format(action))
+                    counts[action] = 0
+                    continue
 
                 # Take action
                 state_copy = create_env_copy(self.state)
@@ -130,6 +135,8 @@ class MCTSPlayer:
                 return action
             except:
                 # This action created some problem
+                tb = traceback.format_exc()
+                print (tb)
                 counts[action] = 0
                 continue
 

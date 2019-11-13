@@ -72,7 +72,7 @@ class Player:
                 pickle.dump([], f)
 
         # Create the network
-        self.fnet = NeuralTrainer(10, board_size, epochs=1, batch_size=256, lr=0.1)
+        self.fnet = NeuralTrainer(10, board_size, epochs=1, batch_size=256, lr=0.05)
         if fnet is not None:
             # Load the network from the file
             self.fnet.load_model(fnet)
@@ -188,7 +188,5 @@ class Player:
 
 if __name__ == '__main__':
     # Create a player
-    player = Player(13, 200, 14, batch_size=150000, running_batch_file='nov11/batch_file.pkl', load_running_batch=False, fnet='nov10/net32.model')
-    player.self_play(1000, 'nov11/', logging=True, log_file='nov11/training.txt', game_offset=0)
-    # player = Player(13, 200, 14, batch_size=150000, running_batch_file='nov10/batch_file.pkl', load_running_batch=True, fnet='nov10/net13.model')
-    # player.self_play(1000, 'nov10/', logging=True, log_file='nov10/training.txt', game_offset=14)
+    player = Player(13, 200, 14, batch_size=150000, load_running_batch=False)
+    player.self_play(1000, 'training_logs_1/', logging=True, log_file='training_logs_1/training.txt', game_offset=0)
